@@ -78,9 +78,9 @@ class MealRepository: ObservableObject {
         meal.craftDocId = docId
         try modelContext.save()
 
-        // Add photos to the document if any
-        if !meal.photoData.isEmpty {
-            try await craftAPI.addMealPhotos(documentId: docId, photoData: meal.photoData)
+        // Add photos and description to the document
+        if !meal.photoData.isEmpty || !meal.notes.isEmpty {
+            try await craftAPI.addMealContent(documentId: docId, photoData: meal.photoData, description: meal.notes)
         }
     }
 

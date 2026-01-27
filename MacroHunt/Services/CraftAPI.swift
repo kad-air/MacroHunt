@@ -143,21 +143,28 @@ class CraftAPI {
         return itemId
     }
 
-    /// Adds photo content to a Craft document
-    func addMealPhotos(documentId: String, photoData: [Data]) async throws {
-        guard !photoData.isEmpty else { return }
-
-        // For now, we'll add a note about photos - Craft API requires image URLs, not raw data
-        // In a production app, you'd upload images to a hosting service first
-        let blocks: [[String: Any]] = photoData.enumerated().map { index, _ in
-            [
-                "type": "text",
-                "markdown": "Photo \(index + 1) attached"
-            ]
+    /// Uploads an image to a Craft document
+    private func uploadImage(documentId: String, imageData: Data) async throws {
+        let urlString = "\(baseURL)/upload?position=end&pageId=\(documentId)"
+        guard let url = URL(string: urlString) else {
+            throw APIError.invalidURL(urlString)
         }
 
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        request.httpBody = imageData
+
+        let _ = try await executeRequest(request)
+    }
+
+    /// Adds a text block to a Craft document
+    private func addTextBlock(documentId: String, text: String) async throws {
         let payload: [String: Any] = [
-            "blocks": blocks,
+            "blocks": [
+                ["type": "text", "markdown": text]
+            ],
             "position": [
                 "position": "end",
                 "pageId": documentId
@@ -167,5 +174,18 @@ class CraftAPI {
         let body = try JSONSerialization.data(withJSONObject: payload)
         let request = try buildRequest(endpoint: "/blocks", method: "POST", body: body)
         let _ = try await executeRequest(request)
+    }
+
+    /// Adds photos and description to a Craft meal document
+    func addMealContent(documentId: String, photoData: [Data], description: String) async throws {
+        // Upload each photo
+        for data in photoData {
+            try await uploadImage(documentId: documentId, imageData: data)
+        }
+
+        // Add description if provided
+        if !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            try await addTextBlock(documentId: documentId, text: description)
+        }
     }
 }
