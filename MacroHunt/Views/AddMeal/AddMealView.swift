@@ -9,6 +9,7 @@ struct AddMealView: View {
 
     @State private var selectedPhotos: [UIImage] = []
     @State private var mealType: MealType = .lunch
+    @State private var mealDate: Date = Date()
     @State private var description: String = ""
     @State private var notes: String = ""
 
@@ -97,8 +98,18 @@ struct AddMealView: View {
             // Meal Type
             GlassCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Meal Type", icon: "clock.fill")
+                    SectionHeader(title: "Meal Type", icon: "fork.knife")
                     MealTypeSelector(selectedType: $mealType)
+                }
+            }
+
+            // Date & Time
+            GlassCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionHeader(title: "Date & Time", icon: "clock.fill")
+                    DatePicker("", selection: $mealDate, in: ...Date())
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
                 }
             }
 
@@ -247,7 +258,7 @@ struct AddMealView: View {
                 // Create meal object
                 let meal = Meal(
                     name: analysis.mealName,
-                    date: Date(),
+                    date: mealDate,
                     mealType: mealType,
                     calories: analysis.calories,
                     protein: analysis.protein,
