@@ -6,9 +6,12 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var credentials: CredentialsManager
 
-    @Query(filter: #Predicate<Meal> { meal in
-        meal.date >= Calendar.current.startOfDay(for: Date())
-    }, sort: \Meal.date) private var todayMeals: [Meal]
+    @Query(sort: \Meal.date) private var allMeals: [Meal]
+
+    private var todayMeals: [Meal] {
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        return allMeals.filter { $0.date >= startOfToday }
+    }
 
     @State private var showingAddMeal = false
     @State private var mealToDelete: Meal?
