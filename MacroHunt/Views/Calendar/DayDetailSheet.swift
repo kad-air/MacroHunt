@@ -124,6 +124,7 @@ struct DayDetailSheet: View {
     // MARK: - Helpers
 
     private func calorieColor(_ calories: Int, goal: Int) -> Color {
+        guard goal > 0 else { return .primary }
         let ratio = Double(calories) / Double(goal)
         if ratio < 0.8 {
             return .primary

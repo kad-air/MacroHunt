@@ -258,6 +258,7 @@ private struct DayCell: View {
     }
 
     private var calorieIndicatorColor: Color {
+        guard goal > 0 else { return .gray }
         let ratio = Double(calories) / Double(goal)
         if ratio < 0.5 {
             return .gray

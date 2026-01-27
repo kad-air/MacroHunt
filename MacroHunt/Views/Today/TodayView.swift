@@ -106,7 +106,7 @@ struct TodayView: View {
 
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(Color.orange)
-                                .frame(width: min(CGFloat(totalCalories) / CGFloat(goal) * geometry.size.width, geometry.size.width), height: 12)
+                                .frame(width: max(0, min(goal > 0 ? CGFloat(totalCalories) / CGFloat(goal) * geometry.size.width : 0, geometry.size.width)), height: 12)
                         }
                     }
                     .frame(height: 12)
