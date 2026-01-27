@@ -14,9 +14,6 @@ struct TodayView: View {
     }
 
     @State private var showingAddMeal = false
-    @State private var mealToDelete: Meal?
-    @State private var showDeleteConfirmation = false
-    @State private var isDeleting = false
     @State private var deleteError: String?
 
     var body: some View {
@@ -65,18 +62,6 @@ struct TodayView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingAddMeal) {
                 AddMealView()
-            }
-            .alert("Delete Meal?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {
-                    mealToDelete = nil
-                }
-                Button("Delete", role: .destructive) {
-                    if let meal = mealToDelete {
-                        deleteMeal(meal)
-                    }
-                }
-            } message: {
-                Text("This will permanently delete this meal from both your device and Craft.")
             }
             .alert("Delete Failed", isPresented: Binding(
                 get: { deleteError != nil },
@@ -148,20 +133,24 @@ struct TodayView: View {
                 .font(.headline)
                 .padding(.horizontal)
 
-            VStack(spacing: 12) {
+            List {
                 ForEach(todayMeals) { meal in
                     MealCard(meal: meal)
-                        .contextMenu {
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                mealToDelete = meal
-                                showDeleteConfirmation = true
+                                deleteMeal(meal)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
                 }
             }
-            .padding(.horizontal)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: CGFloat(todayMeals.count) * 110)
         }
     }
 
@@ -204,20 +193,13 @@ struct TodayView: View {
     // MARK: - Actions
 
     private func deleteMeal(_ meal: Meal) {
-        isDeleting = true
         Task {
             do {
                 let repository = MealRepository(modelContext: modelContext, credentials: credentials)
                 try await repository.deleteMealWithSync(meal)
-                await MainActor.run {
-                    mealToDelete = nil
-                    isDeleting = false
-                }
             } catch {
                 await MainActor.run {
                     deleteError = error.localizedDescription
-                    mealToDelete = nil
-                    isDeleting = false
                 }
             }
         }
