@@ -15,6 +15,7 @@ struct TodayView: View {
 
     @State private var showingAddMeal = false
     @State private var mealToDelete: Meal?
+    @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
 
@@ -65,7 +66,7 @@ struct TodayView: View {
             .sheet(isPresented: $showingAddMeal) {
                 AddMealView()
             }
-            .alert("Delete Meal?", isPresented: .constant(mealToDelete != nil && !isDeleting)) {
+            .alert("Delete Meal?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {
                     mealToDelete = nil
                 }
@@ -77,7 +78,10 @@ struct TodayView: View {
             } message: {
                 Text("This will permanently delete this meal from both your device and Craft.")
             }
-            .alert("Delete Failed", isPresented: .constant(deleteError != nil)) {
+            .alert("Delete Failed", isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )) {
                 Button("OK") {
                     deleteError = nil
                 }
@@ -150,6 +154,7 @@ struct TodayView: View {
                         .contextMenu {
                             Button(role: .destructive) {
                                 mealToDelete = meal
+                                showDeleteConfirmation = true
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
