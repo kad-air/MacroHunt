@@ -57,7 +57,7 @@ struct PhotoCaptureView: View {
             if !selectedPhotos.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(selectedPhotos.enumerated()), id: \.offset) { index, image in
+                        ForEach(Array(selectedPhotos.enumerated()), id: \.offset) { (index: Int, image: UIImage) in
                             ZStack(alignment: .topTrailing) {
                                 Image(uiImage: image)
                                     .resizable()
