@@ -57,9 +57,9 @@ struct PhotoCaptureView: View {
             if !selectedPhotos.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(selectedPhotos.enumerated()), id: \.offset) { (index: Int, image: UIImage) in
+                        ForEach(selectedPhotos.indices, id: \.self) { index in
                             ZStack(alignment: .topTrailing) {
-                                Image(uiImage: image)
+                                Image(uiImage: selectedPhotos[index])
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 100, height: 100)
@@ -67,7 +67,7 @@ struct PhotoCaptureView: View {
 
                                 Button {
                                     withAnimation {
-                                        selectedPhotos.remove(at: index)
+                                        _ = selectedPhotos.remove(at: index)
                                     }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
