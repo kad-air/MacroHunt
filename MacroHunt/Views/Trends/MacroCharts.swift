@@ -8,6 +8,10 @@ struct CalorieTrendChart: View {
     let data: [(date: Date, calories: Int)]
     let goal: Int
 
+    private var isWeekView: Bool {
+        data.count <= 7
+    }
+
     var body: some View {
         Chart {
             // Goal line
@@ -43,13 +47,20 @@ struct CalorieTrendChart: View {
         }
         .chartYScale(domain: 0...(max(goal, (data.map(\.calories).max() ?? 0)) + 500))
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day)) { value in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+            if isWeekView {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                }
+            } else {
+                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                }
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading) { value in
+            AxisMarks(position: .leading) { _ in
                 AxisGridLine()
                 AxisValueLabel()
             }

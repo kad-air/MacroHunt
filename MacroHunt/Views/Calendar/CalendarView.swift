@@ -2,6 +2,10 @@
 import SwiftUI
 import SwiftData
 
+extension Date: @retroactive Identifiable {
+    public var id: TimeInterval { timeIntervalSince1970 }
+}
+
 struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var credentials: CredentialsManager
@@ -10,8 +14,7 @@ struct CalendarView: View {
 
     @State private var selectedDate = Date()
     @State private var currentMonth = Date()
-    @State private var showingDayDetail = false
-    @State private var selectedDayMeals: [Meal] = []
+    @State private var detailDate: Date?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible()), count: 7)
@@ -49,8 +52,8 @@ struct CalendarView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingDayDetail) {
-                DayDetailSheet(date: selectedDate, meals: selectedDayMeals)
+            .sheet(item: $detailDate) { date in
+                DayDetailSheet(date: date, meals: mealsForDate(date) ?? [])
             }
         }
     }
@@ -115,8 +118,7 @@ struct CalendarView: View {
                             ) {
                                 selectedDate = date
                                 if let meals = mealsForDate(date), !meals.isEmpty {
-                                    selectedDayMeals = meals
-                                    showingDayDetail = true
+                                    detailDate = date
                                 }
                             }
                         } else {
@@ -152,8 +154,7 @@ struct CalendarView: View {
                     Spacer()
 
                     Button("View Details") {
-                        selectedDayMeals = meals
-                        showingDayDetail = true
+                        detailDate = selectedDate
                     }
                     .font(.subheadline)
                 }
