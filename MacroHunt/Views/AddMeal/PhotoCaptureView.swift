@@ -126,7 +126,7 @@ struct PhotoCaptureView: View {
             }
         }
         .onChange(of: photoPickerItems) { _, items in
-            Task {
+            Task<Void, Never> {
                 for item in items {
                     if let data = try? await item.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
