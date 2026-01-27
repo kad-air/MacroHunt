@@ -117,9 +117,9 @@ struct TodayView: View {
                     let totalCarbs = todayMeals.reduce(0.0) { $0 + $1.carbs }
                     let totalFat = todayMeals.reduce(0.0) { $0 + $1.fat }
 
-                    MacroRingView(value: totalProtein, goal: 150, color: .red, label: "Protein", unit: "g")
-                    MacroRingView(value: totalCarbs, goal: 250, color: .blue, label: "Carbs", unit: "g")
-                    MacroRingView(value: totalFat, goal: 70, color: .yellow, label: "Fat", unit: "g")
+                    MacroRingView(value: totalProtein, goal: Double(credentials.proteinGoal), color: .red, label: "Protein", unit: "g")
+                    MacroRingView(value: totalCarbs, goal: Double(credentials.carbsGoal), color: .blue, label: "Carbs", unit: "g")
+                    MacroRingView(value: totalFat, goal: Double(credentials.fatGoal), color: .yellow, label: "Fat", unit: "g")
                 }
             }
         }

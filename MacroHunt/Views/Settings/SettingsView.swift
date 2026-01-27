@@ -39,6 +39,33 @@ struct SettingsView: View {
                                             .foregroundColor(.secondary)
                                     }
                                 }
+
+                                Divider()
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Macro Split")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+
+                                    Picker("Macro Split", selection: $credentials.macroSplit) {
+                                        ForEach(MacroSplit.allCases) { split in
+                                            Text(split.displayName).tag(split)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+
+                                    Text(credentials.macroSplit.description)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                // Calculated macro goals display
+                                HStack(spacing: 16) {
+                                    MacroGoalLabel(name: "Protein", value: credentials.proteinGoal, color: .red)
+                                    MacroGoalLabel(name: "Carbs", value: credentials.carbsGoal, color: .blue)
+                                    MacroGoalLabel(name: "Fat", value: credentials.fatGoal, color: .yellow)
+                                }
+                                .padding(.top, 4)
                             }
                         }
                         .padding(.horizontal)
@@ -86,6 +113,24 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+private struct MacroGoalLabel: View {
+    let name: String
+    let value: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(value)g")
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundColor(color)
+            Text(name)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
