@@ -150,6 +150,7 @@ struct TodayView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .scrollDisabled(true)
             .frame(minHeight: CGFloat(todayMeals.count) * 110)
         }
     }
