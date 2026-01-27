@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject var credentials: CredentialsManager
 
     @State private var showingClearConfirmation = false
+    @FocusState private var calorieFieldFocused: Bool
 
     var body: some View {
         ZStack {
@@ -73,6 +74,7 @@ struct SettingsView: View {
                                     TextField("2000", value: $credentials.dailyCalorieGoal, format: .number)
                                         .inputFieldStyle()
                                         .keyboardType(.numberPad)
+                                        .focused($calorieFieldFocused)
 
                                     Text("kcal")
                                         .foregroundColor(.secondary)
@@ -138,6 +140,14 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will remove all stored API keys and tokens.")
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    calorieFieldFocused = false
+                }
+            }
         }
     }
 }
