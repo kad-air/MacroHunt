@@ -1,0 +1,495 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		001000001000000000000001 /* MacroHuntApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000001 /* MacroHuntApp.swift */; };
+		001000001000000000000002 /* Meal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000002 /* Meal.swift */; };
+		001000001000000000000003 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000003 /* MainTabView.swift */; };
+		001000001000000000000004 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000004 /* TodayView.swift */; };
+		001000001000000000000005 /* MealCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000005 /* MealCard.swift */; };
+		001000001000000000000006 /* AddMealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000006 /* AddMealView.swift */; };
+		001000001000000000000007 /* PhotoCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000007 /* PhotoCaptureView.swift */; };
+		001000001000000000000008 /* MealTypeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000008 /* MealTypeSelector.swift */; };
+		001000001000000000000009 /* ReviewMealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000009 /* ReviewMealView.swift */; };
+		001000001000000000000010 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000010 /* CalendarView.swift */; };
+		001000001000000000000011 /* DayDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000011 /* DayDetailSheet.swift */; };
+		001000001000000000000012 /* TrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000012 /* TrendsView.swift */; };
+		001000001000000000000013 /* MacroCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000013 /* MacroCharts.swift */; };
+		001000001000000000000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000014 /* SettingsView.swift */; };
+		001000001000000000000015 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000015 /* OnboardingView.swift */; };
+		001000001000000000000016 /* CraftAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000016 /* CraftAPI.swift */; };
+		001000001000000000000017 /* GeminiAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000017 /* GeminiAPI.swift */; };
+		001000001000000000000018 /* MealRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000018 /* MealRepository.swift */; };
+		001000001000000000000019 /* CredentialsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000019 /* CredentialsManager.swift */; };
+		001000001000000000000020 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000020 /* KeychainHelper.swift */; };
+		001000001000000000000021 /* NetworkConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000021 /* NetworkConfig.swift */; };
+		001000001000000000000022 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000022 /* APIError.swift */; };
+		001000001000000000000023 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000023 /* DesignSystem.swift */; };
+		001000001000000000000024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000024 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		001000002000000000000000 /* MacroHunt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacroHunt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		001000002000000000000001 /* MacroHuntApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroHuntApp.swift; sourceTree = "<group>"; };
+		001000002000000000000002 /* Meal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meal.swift; sourceTree = "<group>"; };
+		001000002000000000000003 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		001000002000000000000004 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		001000002000000000000005 /* MealCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCard.swift; sourceTree = "<group>"; };
+		001000002000000000000006 /* AddMealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMealView.swift; sourceTree = "<group>"; };
+		001000002000000000000007 /* PhotoCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCaptureView.swift; sourceTree = "<group>"; };
+		001000002000000000000008 /* MealTypeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealTypeSelector.swift; sourceTree = "<group>"; };
+		001000002000000000000009 /* ReviewMealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewMealView.swift; sourceTree = "<group>"; };
+		001000002000000000000010 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		001000002000000000000011 /* DayDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailSheet.swift; sourceTree = "<group>"; };
+		001000002000000000000012 /* TrendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsView.swift; sourceTree = "<group>"; };
+		001000002000000000000013 /* MacroCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroCharts.swift; sourceTree = "<group>"; };
+		001000002000000000000014 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		001000002000000000000015 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		001000002000000000000016 /* CraftAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftAPI.swift; sourceTree = "<group>"; };
+		001000002000000000000017 /* GeminiAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAPI.swift; sourceTree = "<group>"; };
+		001000002000000000000018 /* MealRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRepository.swift; sourceTree = "<group>"; };
+		001000002000000000000019 /* CredentialsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsManager.swift; sourceTree = "<group>"; };
+		001000002000000000000020 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		001000002000000000000021 /* NetworkConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkConfig.swift; sourceTree = "<group>"; };
+		001000002000000000000022 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		001000002000000000000023 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		001000002000000000000024 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		001000003000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		001000004000000000000000 = {
+			isa = PBXGroup;
+			children = (
+				001000004000000000000001 /* MacroHunt */,
+				001000004000000000000099 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		001000004000000000000001 /* MacroHunt */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000001 /* MacroHuntApp.swift */,
+				001000004000000000000002 /* Models */,
+				001000004000000000000003 /* Views */,
+				001000004000000000000004 /* Services */,
+				001000004000000000000005 /* Utilities */,
+				001000002000000000000024 /* Assets.xcassets */,
+			);
+			path = MacroHunt;
+			sourceTree = "<group>";
+		};
+		001000004000000000000002 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000002 /* Meal.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		001000004000000000000003 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000003 /* MainTabView.swift */,
+				001000004000000000000006 /* Today */,
+				001000004000000000000007 /* AddMeal */,
+				001000004000000000000008 /* Calendar */,
+				001000004000000000000009 /* Trends */,
+				001000004000000000000010 /* Settings */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		001000004000000000000004 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000016 /* CraftAPI.swift */,
+				001000002000000000000017 /* GeminiAPI.swift */,
+				001000002000000000000018 /* MealRepository.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		001000004000000000000005 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000019 /* CredentialsManager.swift */,
+				001000002000000000000020 /* KeychainHelper.swift */,
+				001000002000000000000021 /* NetworkConfig.swift */,
+				001000002000000000000022 /* APIError.swift */,
+				001000002000000000000023 /* DesignSystem.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		001000004000000000000006 /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000004 /* TodayView.swift */,
+				001000002000000000000005 /* MealCard.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		001000004000000000000007 /* AddMeal */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000006 /* AddMealView.swift */,
+				001000002000000000000007 /* PhotoCaptureView.swift */,
+				001000002000000000000008 /* MealTypeSelector.swift */,
+				001000002000000000000009 /* ReviewMealView.swift */,
+			);
+			path = AddMeal;
+			sourceTree = "<group>";
+		};
+		001000004000000000000008 /* Calendar */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000010 /* CalendarView.swift */,
+				001000002000000000000011 /* DayDetailSheet.swift */,
+			);
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		001000004000000000000009 /* Trends */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000012 /* TrendsView.swift */,
+				001000002000000000000013 /* MacroCharts.swift */,
+			);
+			path = Trends;
+			sourceTree = "<group>";
+		};
+		001000004000000000000010 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000014 /* SettingsView.swift */,
+				001000002000000000000015 /* OnboardingView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		001000004000000000000099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				001000002000000000000000 /* MacroHunt.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		001000005000000000000001 /* MacroHunt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 001000006000000000000001 /* Build configuration list for PBXNativeTarget "MacroHunt" */;
+			buildPhases = (
+				001000005000000000000002 /* Sources */,
+				001000003000000000000001 /* Frameworks */,
+				001000005000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MacroHunt;
+			productName = MacroHunt;
+			productReference = 001000002000000000000000 /* MacroHunt.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		001000007000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					001000005000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 001000006000000000000002 /* Build configuration list for PBXProject "MacroHunt" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 001000004000000000000000;
+			productRefGroup = 001000004000000000000099 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				001000005000000000000001 /* MacroHunt */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		001000005000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				001000001000000000000024 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		001000005000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				001000001000000000000001 /* MacroHuntApp.swift in Sources */,
+				001000001000000000000002 /* Meal.swift in Sources */,
+				001000001000000000000003 /* MainTabView.swift in Sources */,
+				001000001000000000000004 /* TodayView.swift in Sources */,
+				001000001000000000000005 /* MealCard.swift in Sources */,
+				001000001000000000000006 /* AddMealView.swift in Sources */,
+				001000001000000000000007 /* PhotoCaptureView.swift in Sources */,
+				001000001000000000000008 /* MealTypeSelector.swift in Sources */,
+				001000001000000000000009 /* ReviewMealView.swift in Sources */,
+				001000001000000000000010 /* CalendarView.swift in Sources */,
+				001000001000000000000011 /* DayDetailSheet.swift in Sources */,
+				001000001000000000000012 /* TrendsView.swift in Sources */,
+				001000001000000000000013 /* MacroCharts.swift in Sources */,
+				001000001000000000000014 /* SettingsView.swift in Sources */,
+				001000001000000000000015 /* OnboardingView.swift in Sources */,
+				001000001000000000000016 /* CraftAPI.swift in Sources */,
+				001000001000000000000017 /* GeminiAPI.swift in Sources */,
+				001000001000000000000018 /* MealRepository.swift in Sources */,
+				001000001000000000000019 /* CredentialsManager.swift in Sources */,
+				001000001000000000000020 /* KeychainHelper.swift in Sources */,
+				001000001000000000000021 /* NetworkConfig.swift in Sources */,
+				001000001000000000000022 /* APIError.swift in Sources */,
+				001000001000000000000023 /* DesignSystem.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		001000008000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		001000008000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		001000008000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kad-air.MacroHunt";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		001000008000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kad-air.MacroHunt";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		001000006000000000000001 /* Build configuration list for PBXNativeTarget "MacroHunt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				001000008000000000000003 /* Debug */,
+				001000008000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		001000006000000000000002 /* Build configuration list for PBXProject "MacroHunt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				001000008000000000000001 /* Debug */,
+				001000008000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 001000007000000000000001 /* Project object */;
+}
