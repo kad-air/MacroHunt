@@ -9,6 +9,7 @@ class CredentialsManager: ObservableObject {
     private let defaults: UserDefaults?
     private let keychain = KeychainHelper.shared
     private let service = "com.kad-air.MacroHunt"
+    private var isInitializing = true
 
     let isAppGroupAvailable: Bool
 
@@ -16,6 +17,7 @@ class CredentialsManager: ObservableObject {
 
     @Published var craftToken: String {
         didSet {
+            guard !isInitializing else { return }
             let success = keychain.save(craftToken, service: service, account: "craftToken")
             lastKeychainError = !success
         }
@@ -23,12 +25,14 @@ class CredentialsManager: ObservableObject {
 
     @Published var spaceId: String {
         didSet {
+            guard !isInitializing else { return }
             defaults?.set(spaceId, forKey: "spaceId")
         }
     }
 
     @Published var geminiKey: String {
         didSet {
+            guard !isInitializing else { return }
             let success = keychain.save(geminiKey, service: service, account: "geminiKey")
             lastKeychainError = !success
         }
@@ -36,12 +40,14 @@ class CredentialsManager: ObservableObject {
 
     @Published var collectionId: String {
         didSet {
+            guard !isInitializing else { return }
             defaults?.set(collectionId, forKey: "collectionId")
         }
     }
 
     @Published var dailyCalorieGoal: Int {
         didSet {
+            guard !isInitializing else { return }
             defaults?.set(dailyCalorieGoal, forKey: "dailyCalorieGoal")
         }
     }
@@ -51,11 +57,15 @@ class CredentialsManager: ObservableObject {
         self.defaults = defaults
         self.isAppGroupAvailable = defaults != nil
 
+        // Load from storage (didSet guards prevent re-saving during init)
         self.craftToken = keychain.read(service: service, account: "craftToken") ?? ""
         self.spaceId = defaults?.string(forKey: "spaceId") ?? ""
         self.geminiKey = keychain.read(service: service, account: "geminiKey") ?? ""
         self.collectionId = defaults?.string(forKey: "collectionId") ?? ""
         self.dailyCalorieGoal = defaults?.integer(forKey: "dailyCalorieGoal") ?? 2000
+
+        // Done initializing - future changes will save
+        isInitializing = false
     }
 
     var isValid: Bool {

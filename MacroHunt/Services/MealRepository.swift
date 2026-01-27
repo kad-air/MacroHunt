@@ -12,14 +12,55 @@ class MealRepository: ObservableObject {
         self.credentials = credentials
     }
 
-    // MARK: - Local Storage
+    // MARK: - Combined Save (Transactional)
 
-    func saveMeal(_ meal: Meal) throws {
+    /// Saves meal to both Craft and local DB. If Craft fails, local save is skipped.
+    func saveMealWithSync(_ meal: Meal) async throws {
+        // Try Craft first - if it fails, don't save locally
+        if credentials.isValid {
+            let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
+
+            // Create the meal item in Craft
+            let docId = try await craftAPI.createMealItem(
+                collectionId: credentials.collectionId,
+                meal: meal
+            )
+            meal.craftDocId = docId
+
+            // Add photos and description to the document
+            if !meal.photoData.isEmpty || !meal.notes.isEmpty {
+                try await craftAPI.addMealContent(documentId: docId, photoData: meal.photoData, description: meal.notes)
+            }
+        }
+
+        // Craft succeeded (or was skipped), now save locally
         modelContext.insert(meal)
         try modelContext.save()
     }
 
-    func deleteMeal(_ meal: Meal) throws {
+    // MARK: - Combined Delete
+
+    /// Deletes meal from both Craft and local DB.
+    func deleteMealWithSync(_ meal: Meal) async throws {
+        // Delete from Craft first if it exists there
+        if credentials.isValid, let craftDocId = meal.craftDocId {
+            let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
+            try await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
+        }
+
+        // Delete locally
+        modelContext.delete(meal)
+        try modelContext.save()
+    }
+
+    // MARK: - Local-Only Operations (for internal use)
+
+    private func saveLocalOnly(_ meal: Meal) throws {
+        modelContext.insert(meal)
+        try modelContext.save()
+    }
+
+    private func deleteLocalOnly(_ meal: Meal) throws {
         modelContext.delete(meal)
         try modelContext.save()
     }
@@ -59,29 +100,6 @@ class MealRepository: ObservableObject {
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
-    }
-
-    // MARK: - Craft Sync
-
-    func syncMealToCraft(_ meal: Meal) async throws {
-        guard credentials.isValid else { return }
-
-        let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
-
-        // Create the meal item in Craft
-        let docId = try await craftAPI.createMealItem(
-            collectionId: credentials.collectionId,
-            meal: meal
-        )
-
-        // Update local meal with Craft document ID
-        meal.craftDocId = docId
-        try modelContext.save()
-
-        // Add photos and description to the document
-        if !meal.photoData.isEmpty || !meal.notes.isEmpty {
-            try await craftAPI.addMealContent(documentId: docId, photoData: meal.photoData, description: meal.notes)
-        }
     }
 
     // MARK: - Analytics Helpers

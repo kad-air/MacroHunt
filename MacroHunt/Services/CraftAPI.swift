@@ -176,6 +176,16 @@ class CraftAPI {
         let _ = try await executeRequest(request)
     }
 
+    /// Deletes a meal item from the Craft collection
+    func deleteMealItem(collectionId: String, itemId: String) async throws {
+        let encodedId = try encodeCollectionId(collectionId)
+        let payload: [String: Any] = ["idsToDelete": [itemId]]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+
+        let request = try buildRequest(endpoint: "/collections/\(encodedId)/items", method: "DELETE", body: body)
+        let _ = try await executeRequest(request)
+    }
+
     /// Adds photos and description to a Craft meal document
     func addMealContent(documentId: String, photoData: [Data], description: String) async throws {
         // Upload each photo

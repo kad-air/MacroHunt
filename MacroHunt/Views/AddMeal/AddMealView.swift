@@ -258,15 +258,9 @@ struct AddMealView: View {
                     photoData: photoData
                 )
 
-                // Save locally
-                modelContext.insert(meal)
-                try modelContext.save()
-
-                // Sync to Craft if credentials are valid
-                if credentials.isValid {
-                    let repository = MealRepository(modelContext: modelContext, credentials: credentials)
-                    try await repository.syncMealToCraft(meal)
-                }
+                // Save to both Craft and local DB (transactional - Craft first)
+                let repository = MealRepository(modelContext: modelContext, credentials: credentials)
+                try await repository.saveMealWithSync(meal)
 
                 await MainActor.run {
                     isSaving = false
