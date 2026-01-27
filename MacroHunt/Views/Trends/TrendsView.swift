@@ -105,7 +105,11 @@ struct TrendsView: View {
     }
 
     private var averages: (calories: Double, protein: Double, carbs: Double, fat: Double) {
-        let days = Double(selectedPeriod.days)
+        // Count unique days with tracked calories
+        let daysWithData = Set(filteredMeals.map { calendar.startOfDay(for: $0.date) }).count
+        guard daysWithData > 0 else { return (0, 0, 0, 0) }
+
+        let days = Double(daysWithData)
         let totals = filteredMeals.reduce((0, 0.0, 0.0, 0.0)) { result, meal in
             (result.0 + meal.calories, result.1 + meal.protein, result.2 + meal.carbs, result.3 + meal.fat)
         }
