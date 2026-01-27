@@ -3,149 +3,86 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var credentials: CredentialsManager
-
-    @State private var showingClearConfirmation = false
     @FocusState private var calorieFieldFocused: Bool
 
     var body: some View {
-        ZStack {
-            LiquidGlassBackground()
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                LiquidGlassBackground()
+                    .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    Text("Settings")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header
+                        Text("Settings")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
 
-                    // API Credentials
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(title: "API Credentials", icon: "key.fill")
+                        // Goals
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 16) {
+                                SectionHeader(title: "Daily Goals", icon: "target")
 
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Craft API Token")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                SecureField("Enter your Craft API token", text: $credentials.craftToken)
-                                    .inputFieldStyle()
-                            }
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Calorie Goal")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
 
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Craft Space ID")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                TextField("Enter your Space ID", text: $credentials.spaceId)
-                                    .inputFieldStyle()
-                            }
+                                    HStack {
+                                        TextField("2000", value: $credentials.dailyCalorieGoal, format: .number)
+                                            .inputFieldStyle()
+                                            .keyboardType(.numberPad)
+                                            .focused($calorieFieldFocused)
 
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Collection ID")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                TextField("Meal Tracker collection ID", text: $credentials.collectionId)
-                                    .inputFieldStyle()
-                            }
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Gemini API Key")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                SecureField("Enter your Gemini API key", text: $credentials.geminiKey)
-                                    .inputFieldStyle()
+                                        Text("kcal")
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
                             }
                         }
-                    }
-                    .padding(.horizontal)
+                        .padding(.horizontal)
 
-                    // Goals
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(title: "Daily Goals", icon: "target")
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Calorie Goal")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-
+                        // API Configuration Link
+                        NavigationLink {
+                            APIConfigurationView()
+                        } label: {
+                            GlassCard {
                                 HStack {
-                                    TextField("2000", value: $credentials.dailyCalorieGoal, format: .number)
-                                        .inputFieldStyle()
-                                        .keyboardType(.numberPad)
-                                        .focused($calorieFieldFocused)
-
-                                    Text("kcal")
+                                    Image(systemName: "key.fill")
+                                        .foregroundColor(.accentColor)
+                                    Text("API Configuration")
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Image(systemName: credentials.isValid ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                        .foregroundColor(credentials.isValid ? .green : .orange)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
                         }
-                    }
-                    .padding(.horizontal)
+                        .padding(.horizontal)
 
-                    // Status
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            SectionHeader(title: "Status", icon: "info.circle")
-
-                            HStack {
-                                Image(systemName: credentials.isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundColor(credentials.isValid ? .green : .red)
-                                Text(credentials.isValid ? "All credentials configured" : "Missing credentials")
-                                    .font(.subheadline)
-                            }
-
-                            if let error = credentials.configurationError {
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
+                        // App Info
+                        VStack(spacing: 4) {
+                            Text("MacroHunt")
+                                .font(.headline)
+                            Text("Version 1.0")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
+                        .padding(.top, 20)
                     }
-                    .padding(.horizontal)
-
-                    // Actions
-                    GlassCard {
-                        VStack(spacing: 12) {
-                            Button(role: .destructive) {
-                                showingClearConfirmation = true
-                            } label: {
-                                Label("Clear All Credentials", systemImage: "trash")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // App Info
-                    VStack(spacing: 4) {
-                        Text("MacroHunt")
-                            .font(.headline)
-                        Text("Version 1.0")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 20)
+                    .padding(.vertical)
                 }
-                .padding(.vertical)
             }
-        }
-        .alert("Clear Credentials?", isPresented: $showingClearConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear", role: .destructive) {
-                credentials.clearKeychainCredentials()
-            }
-        } message: {
-            Text("This will remove all stored API keys and tokens.")
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    calorieFieldFocused = false
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        calorieFieldFocused = false
+                    }
                 }
             }
         }
