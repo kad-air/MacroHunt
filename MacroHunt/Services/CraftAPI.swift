@@ -114,16 +114,16 @@ class CraftAPI {
         dateFormatter.formatOptions = [.withFullDate]
 
         let craftItem: [String: Any] = [
-            "Meal Name": meal.name,
+            "title": meal.name,
             "properties": [
-                "Date": dateFormatter.string(from: meal.date),
-                "Meal Type": meal.mealType.rawValue,
-                "Calories": meal.calories,
-                "Protein (g)": meal.protein,
-                "Carbs (g)": meal.carbs,
-                "Fat (g)": meal.fat,
-                "Key Nutrients": meal.keyNutrients,
-                "Notes": meal.notes
+                "date": dateFormatter.string(from: meal.date),
+                "meal_type": meal.mealType.rawValue,
+                "calories": meal.calories,
+                "protein_g": meal.protein,
+                "carbs_g": meal.carbs,
+                "fat_g": meal.fat,
+                "key_nutrients": meal.keyNutrients,
+                "notes": meal.notes
             ]
         ]
 
