@@ -112,11 +112,17 @@ class CraftAPI {
         // Build the item payload matching Craft collection schema
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withFullDate]
+        dateFormatter.timeZone = TimeZone.current
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a"
+        timeFormatter.timeZone = TimeZone.current
 
         let craftItem: [String: Any] = [
             "meal_name": meal.name,
             "properties": [
                 "date": dateFormatter.string(from: meal.date),
+                "time": timeFormatter.string(from: meal.date),
                 "meal_type": meal.mealType.rawValue,
                 "calories": meal.calories,
                 "protein_g": meal.protein,
