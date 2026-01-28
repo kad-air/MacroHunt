@@ -47,6 +47,7 @@ struct TodayView: View {
                         }
                     }
                     .padding(.vertical)
+                    .padding(.bottom, 80)
                 }
 
                 // Floating Add Button
