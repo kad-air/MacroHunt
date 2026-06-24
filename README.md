@@ -4,8 +4,8 @@ A personal iOS app for logging meals with photos, AI-powered nutritional analysi
 
 ## Features
 
-- **Photo-based meal logging** - Capture meals with camera or photo library (up to 5 photos)
-- **AI nutritional analysis** - Gemini AI analyzes photos to estimate calories, protein, carbs, fat, and key nutrients
+- **Photo or text meal logging** - Capture with camera or photo library (up to 5 photos), or just describe the meal — a photo, a description, or both
+- **AI nutritional analysis** - Claude (Anthropic) analyzes the photos and/or description to estimate calories, protein, carbs, fat, and key nutrients
 - **Today view** - Daily summary with calorie/macro progress and meal cards
 - **Calendar view** - Monthly grid with color-coded calorie indicators and day details
 - **Trends view** - Visualize calorie trends and macro breakdowns with Swift Charts
@@ -19,7 +19,7 @@ A personal iOS app for logging meals with photos, AI-powered nutritional analysi
 
 - iOS 17.0+
 - Xcode 15.0+
-- Gemini API key (for nutritional analysis)
+- Anthropic API key (for nutritional analysis)
 - Craft Docs API credentials (for cloud sync)
 
 ## Setup
@@ -31,7 +31,7 @@ A personal iOS app for logging meals with photos, AI-powered nutritional analysi
    - **Craft API Token** - From Craft Docs developer settings
    - **Craft Space ID** - Your Craft workspace ID
    - **Collection ID** - The "Meal Tracker" collection ID
-   - **Gemini API Key** - From Google AI Studio
+   - **Anthropic API Key** - From the [Anthropic Console](https://console.anthropic.com)
 
 ## Architecture
 
@@ -56,7 +56,7 @@ MacroHunt/
 │   └── Settings/               # Credentials & preferences
 ├── Services/
 │   ├── CraftAPI.swift          # Craft Docs integration
-│   ├── GeminiAPI.swift         # AI analysis
+│   ├── ClaudeAPI.swift         # AI analysis (Anthropic Messages API)
 │   └── MealRepository.swift    # Data layer
 └── Utilities/
     ├── CredentialsManager.swift
