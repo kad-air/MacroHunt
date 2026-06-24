@@ -47,6 +47,10 @@ final class Meal {
     var notes: String
     @Attribute(.externalStorage) var photoData: [Data]
     var craftDocId: String?
+    /// UUID of the Apple Health `.food` correlation written for this meal, if any.
+    /// Links a row to its HealthKit sample so it can be removed on delete. Optional with
+    /// a default so existing stores migrate without a schema break.
+    var healthKitFoodUUID: String?
     var createdAt: Date
 
     var mealType: MealType {
@@ -67,6 +71,7 @@ final class Meal {
         notes: String = "",
         photoData: [Data] = [],
         craftDocId: String? = nil,
+        healthKitFoodUUID: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -81,6 +86,7 @@ final class Meal {
         self.notes = notes
         self.photoData = photoData
         self.craftDocId = craftDocId
+        self.healthKitFoodUUID = healthKitFoodUUID
         self.createdAt = createdAt
     }
 }

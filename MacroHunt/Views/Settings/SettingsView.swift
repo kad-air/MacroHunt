@@ -70,6 +70,10 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal)
 
+                        // Apple Health
+                        HealthKitSettingsCard()
+                            .padding(.horizontal)
+
                         // API Configuration Link
                         NavigationLink {
                             APIConfigurationView()
@@ -110,6 +114,64 @@ struct SettingsView: View {
                     Button("Done") {
                         calorieFieldFocused = false
                     }
+                }
+            }
+        }
+    }
+}
+
+private struct HealthKitSettingsCard: View {
+    @EnvironmentObject var credentials: CredentialsManager
+    @State private var isRequesting = false
+    @State private var message: String?
+
+    private var isAvailable: Bool { HealthKitService.shared.isHealthDataAvailable }
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Apple Health", icon: "heart.fill")
+
+                if isAvailable {
+                    Toggle(isOn: $credentials.healthKitSyncEnabled) {
+                        Text("Sync meals to Apple Health")
+                            .foregroundColor(.primary)
+                    }
+                    .disabled(isRequesting)
+                    .onChange(of: credentials.healthKitSyncEnabled) { _, enabled in
+                        if enabled { requestAuthorization() }
+                    }
+
+                    Text("When on, each meal you log is saved to Apple Health as calories, protein, carbs, and fat. You can change permissions any time in the Health app.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    if let message {
+                        Text(message)
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
+                } else {
+                    Text("Apple Health is not available on this device.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private func requestAuthorization() {
+        isRequesting = true
+        message = nil
+        Task {
+            do {
+                try await HealthKitService.shared.requestAuthorization()
+                await MainActor.run { isRequesting = false }
+            } catch {
+                await MainActor.run {
+                    isRequesting = false
+                    credentials.healthKitSyncEnabled = false
+                    message = "Couldn't enable Health sync: \(error.localizedDescription)"
                 }
             }
         }

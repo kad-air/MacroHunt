@@ -36,6 +36,16 @@ class MealRepository: ObservableObject {
         // Craft succeeded (or was skipped), now save locally
         modelContext.insert(meal)
         try modelContext.save()
+
+        // Best-effort: mirror the meal into Apple Health. This runs only after the
+        // load-bearing Craft → SwiftData save has succeeded, and never throws — a
+        // HealthKit failure or denied permission must not undo a logged meal.
+        if credentials.healthKitSyncEnabled {
+            if let hkUUID = try? await HealthKitService.shared.saveMeal(meal) {
+                meal.healthKitFoodUUID = hkUUID
+                try? modelContext.save()
+            }
+        }
     }
 
     // MARK: - Combined Delete
@@ -46,6 +56,12 @@ class MealRepository: ObservableObject {
         if credentials.isValid, let craftDocId = meal.craftDocId {
             let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
             try await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
+        }
+
+        // Best-effort: remove the mirrored Apple Health entry. Done before the local
+        // delete so the UUID is still available; never throws.
+        if credentials.healthKitSyncEnabled, let hkUUID = meal.healthKitFoodUUID {
+            try? await HealthKitService.shared.deleteMeal(healthKitFoodUUID: hkUUID)
         }
 
         // Delete locally

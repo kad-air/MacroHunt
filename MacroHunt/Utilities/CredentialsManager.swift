@@ -92,6 +92,15 @@ class CredentialsManager: ObservableObject {
         }
     }
 
+    /// Opt-in: mirror logged meals into Apple Health. Independent of `isValid` (Craft/AI
+    /// config); HealthKit sync works even without Craft configured. Defaults off.
+    @Published var healthKitSyncEnabled: Bool {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(healthKitSyncEnabled, forKey: "healthKitSyncEnabled")
+        }
+    }
+
     // Computed macro goals based on calorie goal and split
     var proteinGoal: Int {
         let calories = Double(dailyCalorieGoal) * macroSplit.ratios.protein
@@ -127,6 +136,8 @@ class CredentialsManager: ObservableObject {
         } else {
             self.macroSplit = .balanced
         }
+
+        self.healthKitSyncEnabled = defaults?.bool(forKey: "healthKitSyncEnabled") ?? false
 
         // Done initializing - future changes will save
         isInitializing = false
