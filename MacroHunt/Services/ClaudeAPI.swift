@@ -230,7 +230,10 @@ class ClaudeAPI {
         request.addValue(Self.anthropicVersion, forHTTPHeaderField: "anthropic-version")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
-        let (data, response) = try await NetworkConfig.session.data(for: request)
+        // Use the dedicated reflection session, not the interactive one. This keeps the
+        // slow Opus call off the connection the user-facing meal analyzer relies on, so a
+        // reflection in flight can't starve an analyze request and trip its timeout.
+        let (data, response) = try await NetworkConfig.reflectionSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.noData
