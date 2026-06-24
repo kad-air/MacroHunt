@@ -337,6 +337,9 @@ struct Sparkline: View {
         .chartYAxis(.hidden)
         .chartYScale(domain: yDomain)
         .chartLegend(.hidden)
+        // catmullRom overshoots past the data's min/max; without clipping the
+        // gradient area bleeds out of the tile (Charts don't clip to frame).
+        .clipped()
     }
 }
 
@@ -381,6 +384,8 @@ struct MetricTrendChart: View {
         .chartYAxis {
             AxisMarks(position: .leading)
         }
+        // Keep the catmullRom area/line overshoot inside the card.
+        .clipped()
     }
 }
 
@@ -436,6 +441,7 @@ struct HealthMetricTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.chip))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(Rectangle())
     }
 }
