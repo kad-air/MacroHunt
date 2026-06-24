@@ -159,6 +159,24 @@ class MealRepository: ObservableObject {
         )
     }
 
+    /// Writes all meals that have never been synced to Apple Health.
+    /// Best-effort — individual save failures are skipped. Returns (synced, total).
+    func syncHistoricalMeals(onProgress: @escaping (Int, Int) -> Void) async -> (synced: Int, total: Int) {
+        guard let meals = try? fetchAllMeals().filter({ $0.healthKitFoodUUID == nil }) else { return (0, 0) }
+        let total = meals.count
+        guard total > 0 else { return (0, 0) }
+        var synced = 0
+        for (index, meal) in meals.enumerated() {
+            if let uuid = try? await HealthKitService.shared.saveMeal(meal) {
+                meal.healthKitFoodUUID = uuid
+                try? modelContext.save()
+                synced += 1
+            }
+            onProgress(index + 1, total)
+        }
+        return (synced, total)
+    }
+
     func dailyCaloriesForRange(days: Int) throws -> [(date: Date, calories: Int)] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())

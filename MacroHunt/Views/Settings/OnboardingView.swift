@@ -7,8 +7,14 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var currentStep = 0
+    @Environment(\.modelContext) private var modelContext
     @State private var healthKitStatus: HKAuthorizationStatus = .notDetermined
     @State private var healthKitRequesting = false
+    @State private var healthKitSyncing = false
+    @State private var healthKitSyncCurrent = 0
+    @State private var healthKitSyncTotal = 0
+    @State private var healthKitSyncComplete = false
+    @State private var healthKitSyncedCount = 0
 
     var body: some View {
         ZStack {
@@ -178,12 +184,27 @@ struct OnboardingView: View {
                 if HealthKitService.shared.isHealthDataAvailable {
                     switch healthKitStatus {
                     case .sharingAuthorized:
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Apple Health connected")
-                                .font(.subheadline)
-                                .foregroundColor(.green)
+                        VStack(spacing: 12) {
+                            if healthKitSyncing {
+                                VStack(spacing: 8) {
+                                    ProgressView(value: Double(healthKitSyncCurrent), total: Double(max(healthKitSyncTotal, 1)))
+                                        .tint(.red)
+                                        .padding(.horizontal)
+                                    Text("Syncing past meals… \(healthKitSyncCurrent) of \(healthKitSyncTotal)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } else {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text(healthKitSyncComplete && healthKitSyncedCount > 0
+                                        ? "\(healthKitSyncedCount) past meal\(healthKitSyncedCount == 1 ? "" : "s") synced to Apple Health"
+                                        : "Apple Health connected")
+                                        .font(.subheadline)
+                                        .foregroundColor(.green)
+                                }
+                            }
                         }
                         .padding()
 
@@ -227,18 +248,35 @@ struct OnboardingView: View {
         Task {
             do {
                 try await HealthKitService.shared.requestAuthorization()
+                let status = HealthKitService.shared.energyAuthorizationStatus()
                 await MainActor.run {
                     healthKitRequesting = false
-                    healthKitStatus = HealthKitService.shared.energyAuthorizationStatus()
-                    credentials.healthKitSyncEnabled = (healthKitStatus == .sharingAuthorized)
+                    healthKitStatus = status
+                    credentials.healthKitSyncEnabled = (status == .sharingAuthorized)
+                }
+                if status == .sharingAuthorized {
+                    await syncHistoricalMeals()
                 }
             } catch {
                 await MainActor.run {
                     healthKitRequesting = false
-                    // Leave toggle off; user can enable in Settings later
                 }
             }
         }
+    }
+
+    private func syncHistoricalMeals() async {
+        let repo = MealRepository(modelContext: modelContext, credentials: credentials)
+        healthKitSyncing = true
+        healthKitSyncCurrent = 0
+        healthKitSyncTotal = 0
+        let result = await repo.syncHistoricalMeals { current, total in
+            healthKitSyncCurrent = current
+            healthKitSyncTotal = total
+        }
+        healthKitSyncing = false
+        healthKitSyncedCount = result.synced
+        healthKitSyncComplete = true
     }
 
     private var claudeSetupStep: some View {
