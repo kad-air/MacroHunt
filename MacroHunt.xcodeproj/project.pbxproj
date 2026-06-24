@@ -425,6 +425,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -454,6 +455,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
