@@ -2,16 +2,21 @@
 import Foundation
 import HealthKit
 
-/// Writes logged meals into Apple Health as dietary nutrition samples.
+/// Bridges MacroHunt and Apple Health.
 ///
-/// Phase 1 of the HealthKit integration: **write-only**. Each `Meal` is saved as an
-/// `HKCorrelation` of type `.food` bundling the energy + macro quantity samples that
-/// already live on the model, so the meal appears as a single entry in Apple Health's
-/// nutrition log and can be read by other apps (Fitness, etc.).
+/// **Write** (Phase 1): each `Meal` is saved as an `HKCorrelation` of type `.food`
+/// bundling the energy + macro quantity samples that already live on the model, so the
+/// meal appears as a single entry in Apple Health's nutrition log and can be read by
+/// other apps (Fitness, etc.).
 ///
-/// All work is best-effort and gated by the user's opt-in toggle in Settings — a
-/// HealthKit failure (denied permission, unavailable device) must never block meal
-/// logging. See `MealRepository.saveMealWithSync`.
+/// **Read** (Phase 2): pulls weight, activity/energy-expenditure, and cardiovascular
+/// trends *in* to give Trends an energy-balance and weight picture. A single unified
+/// authorization request covers both directions.
+///
+/// All work is best-effort and gated by the user's opt-in in Settings — a HealthKit
+/// failure (denied permission, unavailable device) must never block meal logging, and
+/// reads degrade gracefully (HealthKit hides read-authorization status, so a denied or
+/// empty read just returns `nil`/`[]`). See `MealRepository.saveMealWithSync`.
 final class HealthKitService {
     static let shared = HealthKitService()
 
@@ -52,12 +57,41 @@ final class HealthKitService {
         return types
     }
 
+    // MARK: - Read types (Phase 2)
+
+    /// Quantity types read for the Trends energy-balance, weight, and cardio surfaces.
+    private static let readQuantityIdentifiers: [HKQuantityTypeIdentifier] = [
+        .bodyMass,
+        .activeEnergyBurned,
+        .basalEnergyBurned,
+        .stepCount,
+        .restingHeartRate,
+        .heartRateVariabilitySDNN,
+        .vo2Max,
+        .heartRateRecoveryOneMinute
+    ]
+
+    private var typesToRead: Set<HKObjectType> {
+        var types = Set<HKObjectType>()
+        for id in Self.readQuantityIdentifiers {
+            if let type = HKObjectType.quantityType(forIdentifier: id) {
+                types.insert(type)
+            }
+        }
+        types.insert(HKObjectType.workoutType())
+        return types
+    }
+
     // MARK: - Authorization
 
-    /// Requests permission to write nutrition data. Phase 1 reads nothing.
+    /// Requests a single unified authorization covering both meal writes (nutrition) and
+    /// the Phase 2 reads (weight / activity / cardio). HealthKit only prompts for types
+    /// whose status is `.notDetermined`, so calling this again for an existing Phase 1
+    /// user surfaces just the new read prompt — which is exactly how the Trends "Connect"
+    /// affordance brings older installs up to date.
     func requestAuthorization() async throws {
         guard isHealthDataAvailable else { throw HealthKitError.unavailable }
-        try await store.requestAuthorization(toShare: nutritionTypesToShare, read: [])
+        try await store.requestAuthorization(toShare: nutritionTypesToShare, read: typesToRead)
     }
 
     /// Share authorization status for our primary write type (dietary energy).
@@ -134,6 +168,182 @@ final class HealthKitService {
 
         guard !objects.isEmpty else { return }
         try await store.delete(objects)
+    }
+
+    // MARK: - Read: Weight (Phase 2)
+
+    private static let kilogramUnit = HKUnit.gramUnit(with: .kilo)
+
+    /// The user's preferred body-weight unit, taken from the Health app. Falls back to the
+    /// device locale's measurement system if Health can't be queried.
+    func preferredWeightUnit() async -> WeightUnit {
+        guard isHealthDataAvailable, let type = HKObjectType.quantityType(forIdentifier: .bodyMass) else {
+            return localeDefaultWeightUnit
+        }
+        guard let units = try? await store.preferredUnits(for: [type]), let unit = units[type] else {
+            return localeDefaultWeightUnit
+        }
+        return unit == .pound() ? .pounds : .kilograms
+    }
+
+    private var localeDefaultWeightUnit: WeightUnit {
+        Locale.current.measurementSystem == .us ? .pounds : .kilograms
+    }
+
+    /// Most recent body-mass measurement, in kilograms.
+    func latestBodyMass() async -> (date: Date, kilograms: Double)? {
+        guard let result = await latestQuantity(identifier: .bodyMass, unit: Self.kilogramUnit) else { return nil }
+        return (date: result.date, kilograms: result.value)
+    }
+
+    /// All body-mass measurements over the trailing `days`, oldest first, in kilograms.
+    func bodyMassSeries(days: Int) async -> [(date: Date, kilograms: Double)] {
+        let samples = await quantitySamples(identifier: .bodyMass, days: days, unit: Self.kilogramUnit)
+        return samples.map { (date: $0.date, kilograms: $0.value) }
+    }
+
+    // MARK: - Read: Activity / energy expenditure (Phase 2)
+
+    /// Active energy burned per day (kcal) over the trailing `days`. Days with no data are omitted.
+    func dailyActiveEnergy(days: Int) async -> [(date: Date, value: Double)] {
+        await dailyStatistics(identifier: .activeEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
+    }
+
+    /// Basal (resting) energy burned per day (kcal) over the trailing `days`.
+    func dailyBasalEnergy(days: Int) async -> [(date: Date, value: Double)] {
+        await dailyStatistics(identifier: .basalEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
+    }
+
+    /// Step count per day over the trailing `days`.
+    func dailySteps(days: Int) async -> [(date: Date, value: Double)] {
+        await dailyStatistics(identifier: .stepCount, unit: .count(), days: days, options: .cumulativeSum)
+    }
+
+    /// Number of recorded workouts over the trailing `days`.
+    func workoutCount(days: Int) async -> Int {
+        guard isHealthDataAvailable else { return 0 }
+        guard let startDate = trailingStart(days: days) else { return 0 }
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: nil, options: .strictStartDate)
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, results, _ in
+                continuation.resume(returning: results?.count ?? 0)
+            }
+            store.execute(query)
+        }
+    }
+
+    // MARK: - Read: Cardiovascular (Phase 2)
+
+    private static let bpmUnit = HKUnit.count().unitDivided(by: .minute())
+    private static let hrvUnit = HKUnit.secondUnit(with: .milli)
+    // mL/(kg·min). Built explicitly — HKUnit(from:) parses left-to-right with no operator
+    // precedence, so "ml/kg*min" would wrongly evaluate as (ml/kg)*min.
+    private static let vo2Unit = HKUnit.literUnit(with: .milli)
+        .unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: .minute()))
+
+    func latestRestingHeartRate() async -> (date: Date, value: Double)? {
+        await latestQuantity(identifier: .restingHeartRate, unit: Self.bpmUnit)
+    }
+
+    func latestHRV() async -> (date: Date, value: Double)? {
+        await latestQuantity(identifier: .heartRateVariabilitySDNN, unit: Self.hrvUnit)
+    }
+
+    func latestVO2Max() async -> (date: Date, value: Double)? {
+        await latestQuantity(identifier: .vo2Max, unit: Self.vo2Unit)
+    }
+
+    func latestCardioRecovery() async -> (date: Date, value: Double)? {
+        await latestQuantity(identifier: .heartRateRecoveryOneMinute, unit: Self.bpmUnit)
+    }
+
+    // MARK: - Read: Query primitives
+
+    /// Start-of-day `days-1` days ago, so the trailing window includes today — mirroring
+    /// `MealRepository.dailyCaloriesForRange(days:)` and the Trends calorie chart.
+    private func trailingStart(days: Int) -> Date? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -(days - 1), to: today)
+    }
+
+    /// Latest single sample for a quantity type, converted to `unit`.
+    private func latestQuantity(identifier: HKQuantityTypeIdentifier, unit: HKUnit) async -> (date: Date, value: Double)? {
+        guard isHealthDataAvailable, let type = HKObjectType.quantityType(forIdentifier: identifier) else { return nil }
+        let sort = [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: sort) { _, results, _ in
+                guard let sample = results?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: (sample.endDate, sample.quantity.doubleValue(for: unit)))
+            }
+            store.execute(query)
+        }
+    }
+
+    /// Raw quantity samples over the trailing window, oldest first.
+    private func quantitySamples(identifier: HKQuantityTypeIdentifier, days: Int, unit: HKUnit) async -> [(date: Date, value: Double)] {
+        guard isHealthDataAvailable,
+              let type = HKObjectType.quantityType(forIdentifier: identifier),
+              let startDate = trailingStart(days: days) else { return [] }
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: nil, options: .strictStartDate)
+        let sort = [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: sort) { _, results, _ in
+                let samples = (results as? [HKQuantitySample]) ?? []
+                continuation.resume(returning: samples.map { ($0.startDate, $0.quantity.doubleValue(for: unit)) })
+            }
+            store.execute(query)
+        }
+    }
+
+    /// One value per day over the trailing window, bucketed by `HKStatisticsCollectionQuery`.
+    /// `options` selects the aggregation: `.cumulativeSum` for energy/steps,
+    /// `.discreteAverage` for rates like resting HR. Days with no samples are omitted.
+    private func dailyStatistics(
+        identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        days: Int,
+        options: HKStatisticsOptions
+    ) async -> [(date: Date, value: Double)] {
+        guard isHealthDataAvailable,
+              let type = HKObjectType.quantityType(forIdentifier: identifier),
+              let startDate = trailingStart(days: days) else { return [] }
+        let calendar = Calendar.current
+        let endDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date()))!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: options,
+                anchorDate: startDate,
+                intervalComponents: DateComponents(day: 1)
+            )
+            query.initialResultsHandler = { _, results, _ in
+                guard let results else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                var points: [(date: Date, value: Double)] = []
+                results.enumerateStatistics(from: startDate, to: endDate) { stat, _ in
+                    let quantity = options.contains(.cumulativeSum) ? stat.sumQuantity() : stat.averageQuantity()
+                    if let quantity {
+                        points.append((stat.startDate, quantity.doubleValue(for: unit)))
+                    }
+                }
+                continuation.resume(returning: points)
+            }
+            store.execute(query)
+        }
     }
 }
 

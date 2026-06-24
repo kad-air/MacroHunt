@@ -9,8 +9,8 @@ is the running source of truth — update the checkboxes as phases land.
 
 ## Progress
 
-- [x] **Phase 1 — Write meals to Apple Health** (this PR)
-- [ ] **Phase 2 — Read weight / activity / cardio + weight target**
+- [x] **Phase 1 — Write meals to Apple Health**
+- [x] **Phase 2 — Read weight / activity / cardio + weight target** (this PR)
 - [ ] **Phase 3 — Claude coaching from the combined picture**
 
 ---
@@ -68,27 +68,65 @@ flows to the Fitness app and any other Health-aware app. Write-only; opt-in.
 
 ---
 
-## Phase 2 — Read weight / activity / cardio + weight target
+## Phase 2 — Read weight / activity / cardio + weight target ✅
 
 **Goal:** pull Health data in to give an energy-balance and trend picture, and let the
-user set a weight target.
+user set a weight target. Read access is opt-in via a **single unified authorization**
+(write + read in one prompt), per the product decision below.
 
-**Planned work:**
-- Extend `HealthKitService` with read queries + authorization for:
-  - **Weight:** `bodyMass` (latest + trend series).
-  - **Energy out / activity:** `activeEnergyBurned`, `basalEnergyBurned`, `stepCount`,
-    and `HKWorkout` sessions.
-  - **Cardiovascular:** `restingHeartRate`, `heartRateVariabilitySDNN`, `vo2Max`,
-    `appleCardioRecovery` (slow-moving weekly trends).
-- `CredentialsManager`: add `weightGoal` (+ optional `goalDirection`: lose/maintain/gain)
-  in app-group `UserDefaults`, with input in `SettingsView` beside the calorie goal.
-- Trends surface (`Views/Trends/`): intake-vs-expenditure chart and a weight-trend chart
-  vs. target, reusing components in `MacroCharts.swift`. Add read-trend helpers in a
-  HealthKit data layer paralleling `weeklyAverages()` / `dailyCaloriesForRange(days:)`.
-- Onboarding/Settings: request read authorization for the new types.
+**Done in this PR:**
+- `Services/HealthKitService.swift` — extended the Phase 1 write client into a read/write
+  bridge:
+  - `requestAuthorization()` now requests both share (nutrition) **and** read for the
+    Phase 2 types in one call. HealthKit only prompts for `.notDetermined` types, so an
+    existing Phase 1 install (write already granted) sees just the new read prompt — which
+    is what the Trends "Connect" affordance triggers.
+  - Read query layer (all **best-effort, non-throwing** — a denied/empty read returns
+    `nil`/`[]`): `preferredWeightUnit()`, `latestBodyMass()` + `bodyMassSeries(days:)`,
+    per-day `dailyActiveEnergy` / `dailyBasalEnergy` / `dailySteps`
+    (`HKStatisticsCollectionQuery`), `workoutCount(days:)`, and latest
+    `restingHeartRate` / `HRV (SDNN)` / `vo2Max` / `cardioRecovery`
+    (`heartRateRecoveryOneMinute`). Reusable primitives: `latestQuantity`,
+    `quantitySamples`, `dailyStatistics`, `trailingStart`.
+- `Utilities/CredentialsManager.swift` — `WeightUnit` (kg/lb conversion, canonical store is
+  kg) and `WeightGoalDirection` (lose/maintain/gain) enums; `weightGoalKg` (canonical) and
+  `weightGoalDirection` persisted in app-group `UserDefaults`; `hasWeightGoal` flag.
+- `Views/Trends/TrendsView.swift` — `HealthTrendsViewModel` (`@MainActor`) loads all reads
+  concurrently (`async let`) for the selected period. New sections, each shown only when it
+  has data: **Energy Balance** (logged intake bars vs. active+basal expenditure line, with
+  an average-net summary), **Weight** (current/target tiles + trend chart vs. target),
+  **Activity** (avg steps, avg active energy, workout count), **Cardio Vitals** (resting
+  HR, HRV, VO₂ max, cardio recovery as neutral value tiles). A **Connect Apple Health**
+  card appears when Health is available but no data has been read yet — its button fires the
+  unified authorization and reloads, bringing existing installs up to date.
+- `Views/Trends/MacroCharts.swift` — `EnergyBalanceChart`, `WeightTrendChart` (dashed target
+  rule, unit-aware Y axis), `HealthMetricTile`, `LegendDot`.
+- `Views/Settings/SettingsView.swift` — weight-target input in the Daily Goals card, shown
+  in the Health app's **preferred unit** (resolved via `preferredWeightUnit()`, locale
+  fallback) and stored as kg; a lose/maintain/gain selector appears once a target is entered.
+- `Views/Settings/OnboardingView.swift` + Settings copy — updated to describe the unified
+  write **and** read so the permission prompt isn't a surprise.
 
-**Risks:** read authorization is privacy-gated (HealthKit hides whether read was
-granted); design the UI to degrade gracefully when no data is returned.
+**No project-file changes needed:** all work lives in already-referenced files (no new
+files, no `pbxproj` edits). The `com.apple.developer.healthkit` entitlement and the
+`NSHealthShareUsageDescription` read string were already in place from Phase 1 (the read
+string was even pre-worded for this phase).
+
+**Out of band — verify on a physical device (cannot be done from a cloud build):**
+- HealthKit reads only return data on a real device with real Health data; the Simulator
+  returns nothing, so every section will read as empty there.
+- Existing Phase-1 testers get the read prompt via the Trends **Connect Apple Health** card
+  (or by toggling Apple Health off/on in Settings).
+
+**Notes / known nuances:**
+- Read authorization is privacy-gated — HealthKit hides whether a read was granted. The UI
+  infers "not connected" from "no data at all" and shows the Connect card; every section is
+  individually gated on having data, so partial grants degrade gracefully.
+- VO₂ max and cardio recovery are sparse metrics; their tiles only appear when a value
+  exists. Cardio tiles are deliberately neutral (value + measurement date, no ▲/▼ judgement)
+  to match the Phase 3 coaching ethos.
+- Days with no Health expenditure are omitted from the Energy Balance chart (they remain in
+  the meal-only Calorie Trend above it).
 
 ---
 

@@ -35,6 +35,7 @@ Either a photo *or* a description is sufficient to analyze (`AddMealView.canAnal
 - **ClaudeAPI** (`Services/ClaudeAPI.swift`): Anthropic Messages API client for photo/description → nutrition. The model is a single constant — `claude-sonnet-4-6`; flip to `claude-opus-4-8` for max accuracy. Uses **structured outputs** (`output_config.format` with a JSON schema mirroring `NutritionAnalysis`), so the response is guaranteed schema-valid and needs no JSON cleanup. **If you change `NutritionAnalysis`, update the schema in this file to match.** Images are sent as inline base64 JPEG; the `refusal` stop reason is handled. Raw `URLSession`/`JSONSerialization` — there is no Anthropic SDK dependency.
 - **CraftAPI** (`Services/CraftAPI.swift`): Craft Docs REST client. `createMealItem` returns the new doc id; `addMealContent` uploads photos + a text block; `deleteMealItem` removes it. Retries with exponential backoff (`executeRequest`).
 - **MealRepository** (`Services/MealRepository.swift`): `@MainActor` data layer over the SwiftData `ModelContext`. Owns the transactional save/delete plus the fetch and analytics helpers (`dailyTotals`, `weeklyAverages`, `dailyCaloriesForRange`) that feed Today/Calendar/Trends.
+- **HealthKitService** (`Services/HealthKitService.swift`): `HKHealthStore` read/write bridge. **Write** — saves each `Meal` as a `.food` `HKCorrelation` (Phase 1; gated on the opt-in toggle, best-effort, never blocks logging). **Read** — weight (`bodyMass`), activity/energy (`active`/`basal` energy, steps, workouts), and cardio (`restingHeartRate`, `HRV`, `vo2Max`, `cardioRecovery`) for the Trends Health sections (Phase 2). A single `requestAuthorization()` requests both directions. Reads are best-effort and non-throwing — HealthKit hides read-auth status, so empty results are treated as "not connected" and the UI degrades gracefully. **Do not add a correlation type to the *share* set** — it triggers an uncatchable SIGABRT (see the comment in `nutritionTypesToShare`).
 
 ### Data model
 
@@ -45,7 +46,7 @@ Single SwiftData model: `Meal` (`Models/Meal.swift`). Photo bytes are `@Attribut
 `CredentialsManager` (`Utilities/CredentialsManager.swift`, an `ObservableObject`) is the single source of truth for configuration:
 
 - **Keychain** (via `KeychainHelper`, service `com.kad-air.MacroHunt`): `craftToken`, `anthropicKey`.
-- **App-group `UserDefaults`** (suite `group.kad-air.MacroHunt`): `spaceId`, `collectionId`, `dailyCalorieGoal`, `macroSplit`. The app group may be unavailable if the entitlement isn't configured — surfaced via `configurationError`, not a crash.
+- **App-group `UserDefaults`** (suite `group.kad-air.MacroHunt`): `spaceId`, `collectionId`, `dailyCalorieGoal`, `macroSplit`, `healthKitSyncEnabled`, `weightGoalKg` (canonical kg; entered/displayed in the user's preferred Health unit), `weightGoalDirection`. The app group may be unavailable if the entitlement isn't configured — surfaced via `configurationError`, not a crash.
 - `isValid` requires all four of `craftToken`, `spaceId`, `anthropicKey`, `collectionId`; it gates both AI analysis and Craft sync. Macro goals (`proteinGoal`/`carbsGoal`/`fatGoal`) are derived from `dailyCalorieGoal` × the selected `macroSplit`.
 
 Users enter these in **Settings → API Configuration** and in first-run onboarding. The Anthropic key comes from console.anthropic.com.
