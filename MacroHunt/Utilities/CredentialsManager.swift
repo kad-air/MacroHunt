@@ -170,6 +170,15 @@ class CredentialsManager: ObservableObject {
         }
     }
 
+    /// Whether the AI "Daily reflection" coach surfaces on Today. Defaults on. Independent
+    /// of `isValid`, though generating a reflection still needs a configured Anthropic key.
+    @Published var dailyReflectionEnabled: Bool {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(dailyReflectionEnabled, forKey: "dailyReflectionEnabled")
+        }
+    }
+
     /// Whether a weight target has been set (non-zero).
     var hasWeightGoal: Bool { weightGoalKg > 0 }
 
@@ -218,6 +227,9 @@ class CredentialsManager: ObservableObject {
         } else {
             self.weightGoalDirection = .maintain
         }
+
+        // Daily reflection defaults on, but honor a stored "off".
+        self.dailyReflectionEnabled = defaults?.object(forKey: "dailyReflectionEnabled") as? Bool ?? true
 
         // Done initializing - future changes will save
         isInitializing = false

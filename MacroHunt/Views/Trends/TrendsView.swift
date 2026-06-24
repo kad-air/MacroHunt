@@ -41,13 +41,13 @@ enum HealthMetricID: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .steps: return .green
-        case .activeEnergy: return .orange
-        case .workouts: return .pink
-        case .restingHR: return .red
-        case .hrv: return .teal
-        case .vo2Max: return .indigo
-        case .cardioRecovery: return .mint
+        case .steps: return Theme.carbs
+        case .activeEnergy: return Theme.accent
+        case .workouts: return Theme.protein
+        case .restingHR: return Theme.protein
+        case .hrv: return Theme.carbs
+        case .vo2Max: return Theme.fat
+        case .cardioRecovery: return Theme.accent
         }
     }
 
@@ -251,18 +251,17 @@ struct TrendsView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header
-                        Text("Trends")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        MHHeader(kicker: selectedPeriod == .week ? "Last 7 days" : "Last 30 days", title: "Trends")
                             .padding(.horizontal)
 
                         // Period Selector
-                        Picker("Time Period", selection: $selectedPeriod) {
-                            ForEach(TimePeriod.allCases) { period in
-                                Text(period.rawValue).tag(period)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                        SegmentedToggle(
+                            options: TimePeriod.allCases.map { $0.rawValue },
+                            selection: Binding(
+                                get: { selectedPeriod.rawValue },
+                                set: { raw in if let p = TimePeriod(rawValue: raw) { selectedPeriod = p } }
+                            )
+                        )
                         .padding(.horizontal)
 
                         // Meal-based calorie trend
@@ -313,7 +312,8 @@ struct TrendsView: View {
                                 .padding(.horizontal)
                         }
                     }
-                    .padding(.vertical)
+                    .padding(.top)
+                    .padding(.bottom, 110)
                 }
             }
             .navigationBarHidden(true)
@@ -629,7 +629,7 @@ struct TrendsView: View {
                     .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.red)
+                .tint(Theme.accent)
                 .disabled(isConnecting)
 
                 if let connectMessage {

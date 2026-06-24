@@ -82,9 +82,9 @@ struct DayDetailSheet: View {
 
                 // Macros
                 HStack(spacing: 24) {
-                    MacroStat(label: "Protein", value: totalProtein, unit: "g", color: .red)
-                    MacroStat(label: "Carbs", value: totalCarbs, unit: "g", color: .blue)
-                    MacroStat(label: "Fat", value: totalFat, unit: "g", color: .yellow)
+                    MacroStat(label: "Protein", value: totalProtein, unit: "g", color: Theme.protein)
+                    MacroStat(label: "Carbs", value: totalCarbs, unit: "g", color: Theme.carbs)
+                    MacroStat(label: "Fat", value: totalFat, unit: "g", color: Theme.fat)
                 }
             }
         }
@@ -124,14 +124,14 @@ struct DayDetailSheet: View {
     // MARK: - Helpers
 
     private func calorieColor(_ calories: Int, goal: Int) -> Color {
-        guard goal > 0 else { return .primary }
+        guard goal > 0 else { return Theme.ink }
         let ratio = Double(calories) / Double(goal)
         if ratio < 0.8 {
-            return .primary
+            return Theme.ink
         } else if ratio <= 1.1 {
-            return .green
+            return Theme.good
         } else {
-            return .orange
+            return Theme.accent
         }
     }
 }

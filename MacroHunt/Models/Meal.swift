@@ -121,3 +121,15 @@ struct NutritionAnalysis: Codable {
     let fat: Double
     let keyNutrients: String
 }
+
+// MARK: - Daily Reflection (Phase 3 coaching)
+
+/// The structured daily reflection returned by `ClaudeAPI.generateReflection`. Mirrors the
+/// schema in HEALTHKIT_INTEGRATION.md: a headline, a few grounded observations, one gentle
+/// suggestion, and a closing line of encouragement.
+struct CoachingReflection: Codable, Equatable {
+    let headline: String
+    let observations: [String]
+    let suggestion: String
+    let encouragement: String
+}

@@ -24,6 +24,7 @@ struct MacroHuntApp: App {
         WindowGroup {
             MainTabView()
                 .environmentObject(credentials)
+                .tint(Theme.accent)
                 .onAppear {
                     if !credentials.isValid {
                         showingOnboarding = true
@@ -32,6 +33,7 @@ struct MacroHuntApp: App {
                 .sheet(isPresented: $showingOnboarding) {
                     OnboardingView()
                         .environmentObject(credentials)
+                        .tint(Theme.accent)
                 }
         }
         .modelContainer(sharedModelContainer)

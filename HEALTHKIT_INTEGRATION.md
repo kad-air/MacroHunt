@@ -10,8 +10,8 @@ is the running source of truth — update the checkboxes as phases land.
 ## Progress
 
 - [x] **Phase 1 — Write meals to Apple Health**
-- [x] **Phase 2 — Read weight / activity / cardio + weight target** (this PR)
-- [ ] **Phase 3 — Claude coaching from the combined picture**
+- [x] **Phase 2 — Read weight / activity / cardio + weight target**
+- [x] **Phase 3 — Claude coaching from the combined picture** (this PR, with the UX revamp)
 
 ---
 
@@ -130,23 +130,31 @@ string was even pre-worded for this phase).
 
 ---
 
-## Phase 3 — Claude coaching from the combined picture
+## Phase 3 — Claude coaching from the combined picture ✅
 
 **Goal:** thoughtful, supportive, non-judgy guidance grounded in intake + Health trends.
+Surfaced as the **Daily reflection** in the UX revamp.
 
-**Planned work:**
-- New method on `ClaudeAPI` — `generateCoaching(context:)` — separate from meal analysis.
-  Sends a compact JSON snapshot: recent intake averages (from `MealRepository`), weight
-  trend, active energy, resting HR / HRV trend, and the user's calorie/macro/weight goals.
-- Reuse the structured-output (`output_config` + JSON schema) pattern already in
-  `ClaudeAPI`. Suggested schema: `{ headline, observations[], suggestion, encouragement }`.
-- **Tone is a system-prompt contract:** supportive, curious, never shaming; food framed
-  neutrally (no "good/bad" foods, no guilt); acknowledge effort; one gentle, actionable
-  suggestion at a time.
-- **Not medical advice:** clear disclaimer; steer away from anything diagnostic,
-  especially around cardio metrics and rate of weight change.
-- Consider running this single call on `claude-opus-4-8` (max quality) while meal
-  analysis stays on `claude-sonnet-4-6`.
-- Surface as a coaching card (Today or Trends), generated on demand / cached daily.
+**Done in this PR:**
+- `Services/ClaudeAPI.swift` — `generateReflection(context:)`, separate from meal analysis.
+  Runs on **`claude-opus-4-8`** (meal analysis stays on `claude-sonnet-4-6`). Reuses the
+  structured-output (`output_config` + JSON schema) pattern; schema is
+  `{ headline, observations[], suggestion, encouragement }`. **Tone is enforced via the
+  system prompt:** supportive, curious, never shaming; food framed neutrally; one gentle
+  suggestion; explicitly not medical advice.
+- `Models/Meal.swift` — `CoachingReflection` result struct mirroring the schema.
+- `Views/Today/TodayView.swift` — `ReflectionViewModel` builds a compact snapshot from
+  `MealRepository` (today + 7-day averages + daily-calorie series) and best-effort Apple
+  Health reads (latest weight, avg active energy, avg steps, resting HR, HRV) plus the
+  user's goals, then calls Claude. Surfaced as the **Daily reflection** coach card on Today
+  with a full bottom-sheet (observations / one small idea / encouragement / disclaimer /
+  regenerate). Generated on demand and **cached per day** (so it isn't re-billed on every
+  appearance); the card is gated on the `dailyReflectionEnabled` preference + a configured
+  Anthropic key.
+- `Utilities/CredentialsManager.swift` — `dailyReflectionEnabled` flag (defaults on), with a
+  toggle in Settings → Preferences.
 
-**Dependency:** needs Phase 2's Health reads to have meaningful context.
+**Notes / known nuances:**
+- The reflection degrades gracefully when Health or meal data is sparse — the prompt is told
+  to say so kindly rather than overreach.
+- The daily cache lives in standard `UserDefaults` (a per-device convenience), keyed by day.

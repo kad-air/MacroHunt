@@ -17,104 +17,75 @@ struct CalendarView: View {
     @State private var detailDate: Date?
 
     private let calendar = Calendar.current
-    private let columns = Array(repeating: GridItem(.flexible()), count: 7)
-    private let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+    private let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
 
     var body: some View {
         NavigationStack {
             ZStack {
                 LiquidGlassBackground()
-                    .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        Text("Calendar")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 0) {
+                        MHHeader(kicker: monthYearString(from: currentMonth), title: "Calendar")
+                            .padding(.top, 8)
+                            .padding(.bottom, 18)
 
-                        // Month Navigation
-                        monthNavigation
-                            .padding(.horizontal)
+                        calendarCard
 
-                        // Calendar Grid
-                        calendarGrid
-                            .padding(.horizontal)
+                        SectionHeader(title: "Selected day")
+                            .padding(.horizontal, 4)
+                            .padding(.top, 30)
+                            .padding(.bottom, 13)
 
-                        // Selected Day Summary
-                        if let meals = mealsForDate(selectedDate), !meals.isEmpty {
-                            daySummary(meals: meals)
-                                .padding(.horizontal)
-                        }
+                        daySummaryCard
                     }
-                    .padding(.vertical)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 110)
                 }
             }
             .navigationBarHidden(true)
             .sheet(item: $detailDate) { date in
                 DayDetailSheet(date: date, meals: mealsForDate(date) ?? [])
+                    .environmentObject(credentials)
             }
         }
     }
 
-    // MARK: - Month Navigation
+    // MARK: - Calendar card
 
-    private var monthNavigation: some View {
-        HStack {
-            Button {
-                withAnimation {
-                    currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth)!
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title3.weight(.semibold))
-            }
-
-            Spacer()
-
-            Text(monthYearString(from: currentMonth))
-                .font(.title2.weight(.semibold))
-
-            Spacer()
-
-            Button {
-                withAnimation {
-                    currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth)!
-                }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.title3.weight(.semibold))
-            }
-        }
-        .padding()
-        .glassContainer(cornerRadius: 16)
-    }
-
-    // MARK: - Calendar Grid
-
-    private var calendarGrid: some View {
+    private var calendarCard: some View {
         GlassCard {
-            VStack(spacing: 12) {
-                // Weekday headers
+            VStack(spacing: 14) {
+                HStack {
+                    monthButton(systemName: "chevron.left", delta: -1)
+                    Spacer()
+                    Text(monthYearString(from: currentMonth))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                    monthButton(systemName: "chevron.right", delta: 1)
+                }
+
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(weekdays, id: \.self) { day in
                         Text(day)
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.4)
+                            .foregroundStyle(Theme.ink3)
                     }
                 }
 
-                // Days grid
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(daysInMonth(), id: \.self) { date in
-                        if let date = date {
+                LazyVGrid(columns: columns, spacing: 5) {
+                    ForEach(Array(daysInMonth().enumerated()), id: \.offset) { _, date in
+                        if let date {
                             DayCell(
                                 date: date,
                                 calories: caloriesForDate(date),
                                 goal: credentials.dailyCalorieGoal,
                                 isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                                isToday: calendar.isDateInToday(date)
+                                isToday: calendar.isDateInToday(date),
+                                isFuture: calendar.startOfDay(for: date) > calendar.startOfDay(for: Date())
                             ) {
                                 selectedDate = date
                                 if let meals = mealsForDate(date), !meals.isEmpty {
@@ -122,8 +93,7 @@ struct CalendarView: View {
                                 }
                             }
                         } else {
-                            Color.clear
-                                .frame(height: 44)
+                            Color.clear.frame(height: 40)
                         }
                     }
                 }
@@ -131,71 +101,125 @@ struct CalendarView: View {
         }
     }
 
-    // MARK: - Day Summary
+    private func monthButton(systemName: String, delta: Int) -> some View {
+        Button {
+            withAnimation { currentMonth = calendar.date(byAdding: .month, value: delta, to: currentMonth)! }
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Theme.chip))
+        }
+        .buttonStyle(.plain)
+    }
 
-    private func daySummary(meals: [Meal]) -> some View {
+    // MARK: - Selected day summary
+
+    @ViewBuilder
+    private var daySummaryCard: some View {
+        let meals = mealsForDate(selectedDate) ?? []
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(dayString(from: selectedDate))
-                        .font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dayString(from: selectedDate))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(Theme.ink)
+                        Text(daySubtitle(meals))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.ink2)
+                    }
                     Spacer()
-                    Text("\(meals.count) \(meals.count == 1 ? "meal" : "meals")")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    if !meals.isEmpty {
+                        Button { detailDate = selectedDate } label: {
+                            HStack(spacing: 5) {
+                                Text("Details").font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                            }
+                            .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
-                let totalCalories = meals.reduce(0) { $0 + $1.calories }
-
-                HStack {
-                    Text("\(totalCalories) kcal")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-
-                    Spacer()
-
-                    Button("View Details") {
-                        detailDate = selectedDate
+                if meals.isEmpty {
+                    Text("No meals logged this day.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.ink3)
+                        .padding(.top, 14)
+                } else {
+                    let total = meals.reduce(0) { $0 + $1.calories }
+                    let goal = credentials.dailyCalorieGoal
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text("\(total.formatted())")
+                            .font(.system(size: 30, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Theme.ink).monospacedDigit()
+                        Text(" / \(goal.formatted()) kcal")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Theme.ink2)
                     }
-                    .font(.subheadline)
+                    .padding(.top, 14)
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Theme.track)
+                            Capsule().fill(Theme.accent)
+                                .frame(width: geo.size.width * min(goal > 0 ? CGFloat(total) / CGFloat(goal) : 0, 1))
+                        }
+                    }
+                    .frame(height: 6)
+                    .padding(.top, 13)
+
+                    HStack(spacing: 18) {
+                        macroSplit("P", meals.reduce(0.0) { $0 + $1.protein }, Theme.protein)
+                        macroSplit("C", meals.reduce(0.0) { $0 + $1.carbs }, Theme.carbs)
+                        macroSplit("F", meals.reduce(0.0) { $0 + $1.fat }, Theme.fat)
+                    }
+                    .padding(.top, 16)
                 }
             }
         }
     }
 
-    // MARK: - Helper Methods
+    private func macroSplit(_ letter: String, _ grams: Double, _ color: Color) -> some View {
+        HStack(spacing: 7) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text("\(letter) ").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink2)
+            + Text("\(Int(grams))g").font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink)
+        }
+    }
+
+    private func daySubtitle(_ meals: [Meal]) -> String {
+        let count = meals.count
+        let base = count == 0 ? "No meals logged" : "\(count) meal\(count == 1 ? "" : "s") logged"
+        if calendar.isDateInToday(selectedDate) { return base + " · today" }
+        return base
+    }
+
+    // MARK: - Helpers
 
     private func daysInMonth() -> [Date?] {
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: currentMonth))!
         let range = calendar.range(of: .day, in: .month, for: startOfMonth)!
-
         let firstWeekday = calendar.component(.weekday, from: startOfMonth)
         let leadingEmptyDays = firstWeekday - 1
 
         var days: [Date?] = Array(repeating: nil, count: leadingEmptyDays)
-
         for day in range {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: startOfMonth) {
                 days.append(date)
             }
         }
-
-        // Pad to complete the last week
         let remainder = days.count % 7
-        if remainder > 0 {
-            days.append(contentsOf: Array(repeating: nil, count: 7 - remainder))
-        }
-
+        if remainder > 0 { days.append(contentsOf: Array(repeating: nil, count: 7 - remainder)) }
         return days
     }
 
     private func mealsForDate(_ date: Date) -> [Meal]? {
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-
-        let meals = allMeals.filter { meal in
-            meal.date >= startOfDay && meal.date < endOfDay
-        }
-
+        let meals = allMeals.filter { $0.date >= startOfDay && $0.date < endOfDay }
         return meals.isEmpty ? nil : meals
     }
 
@@ -216,7 +240,7 @@ struct CalendarView: View {
     }
 }
 
-// MARK: - Day Cell
+// MARK: - Day cell
 
 private struct DayCell: View {
     let date: Date
@@ -224,52 +248,43 @@ private struct DayCell: View {
     let goal: Int
     let isSelected: Bool
     let isToday: Bool
+    let isFuture: Bool
     let action: () -> Void
 
     private let calendar = Calendar.current
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(spacing: 5) {
                 Text("\(calendar.component(.day, from: date))")
-                    .font(.system(size: 14, weight: isToday ? .bold : .regular))
-
-                if calories > 0 {
-                    Circle()
-                        .fill(calorieIndicatorColor)
-                        .frame(width: 6, height: 6)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 6, height: 6)
-                }
+                    .font(.system(size: 14, weight: isToday ? .bold : .semibold, design: .rounded))
+                    .foregroundStyle(isFuture ? Theme.ink3 : Theme.ink)
+                Circle()
+                    .fill(isFuture ? Color.clear : dotColor)
+                    .frame(width: 6, height: 6)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(height: 40)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(isSelected ? Theme.accentSoft : Color.clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isToday ? Color.accentColor : Color.clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(isToday ? Theme.accent : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
+        .disabled(isFuture)
     }
 
-    private var calorieIndicatorColor: Color {
-        guard goal > 0 else { return .gray }
+    private var dotColor: Color {
+        guard calories > 0, goal > 0 else { return Theme.ink3 }
         let ratio = Double(calories) / Double(goal)
-        if ratio < 0.5 {
-            return .gray
-        } else if ratio < 0.8 {
-            return .blue
-        } else if ratio <= 1.1 {
-            return .green
-        } else {
-            return .orange
-        }
+        if ratio < 0.5 { return Theme.ink3 }
+        if ratio < 0.8 { return Theme.carbs }
+        if ratio <= 1.1 { return Theme.good }
+        return Theme.accent
     }
 }
 
