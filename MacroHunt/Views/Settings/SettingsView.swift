@@ -70,6 +70,10 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal)
 
+                        // Apple Health
+                        HealthKitSettingsCard()
+                            .padding(.horizontal)
+
                         // API Configuration Link
                         NavigationLink {
                             APIConfigurationView()
@@ -113,6 +117,104 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+private struct HealthKitSettingsCard: View {
+    @EnvironmentObject var credentials: CredentialsManager
+    @Environment(\.modelContext) private var modelContext
+    @State private var isRequesting = false
+    @State private var isSyncing = false
+    @State private var syncCurrent = 0
+    @State private var syncTotal = 0
+    @State private var syncComplete = false
+    @State private var syncedCount = 0
+    @State private var message: String?
+
+    private var isAvailable: Bool { HealthKitService.shared.isHealthDataAvailable }
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Apple Health", icon: "heart.fill")
+
+                if isAvailable {
+                    Toggle(isOn: $credentials.healthKitSyncEnabled) {
+                        Text("Sync meals to Apple Health")
+                            .foregroundColor(.primary)
+                    }
+                    .disabled(isRequesting || isSyncing)
+                    .onChange(of: credentials.healthKitSyncEnabled) { _, enabled in
+                        if enabled { requestAuthorization() }
+                    }
+
+                    if isSyncing {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: Double(syncCurrent), total: Double(max(syncTotal, 1)))
+                                .tint(.red)
+                            Text("Syncing past meals… \(syncCurrent) of \(syncTotal)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    } else if syncComplete && syncedCount > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.caption)
+                            Text("\(syncedCount) past meal\(syncedCount == 1 ? "" : "s") synced to Apple Health")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Text("When on, each meal you log is saved to Apple Health as calories, protein, carbs, and fat. You can change permissions any time in the Health app.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    if let message {
+                        Text(message)
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
+                } else {
+                    Text("Apple Health is not available on this device.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private func requestAuthorization() {
+        isRequesting = true
+        message = nil
+        Task {
+            do {
+                try await HealthKitService.shared.requestAuthorization()
+                await MainActor.run { isRequesting = false }
+                await syncHistoricalMeals()
+            } catch {
+                await MainActor.run {
+                    isRequesting = false
+                    credentials.healthKitSyncEnabled = false
+                    message = "Couldn't enable Health sync: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func syncHistoricalMeals() async {
+        let repo = MealRepository(modelContext: modelContext, credentials: credentials)
+        isSyncing = true
+        syncCurrent = 0
+        syncTotal = 0
+        let result = await repo.syncHistoricalMeals { current, total in
+            syncCurrent = current
+            syncTotal = total
+        }
+        isSyncing = false
+        syncedCount = result.synced
+        syncComplete = true
     }
 }
 

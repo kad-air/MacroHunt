@@ -32,6 +32,7 @@
 		001000001000000000000023 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000023 /* DesignSystem.swift */; };
 		001000001000000000000024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000024 /* Assets.xcassets */; };
 		001000001000000000000025 /* APIConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000025 /* APIConfigurationView.swift */; };
+		001000001000000000000026 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000026 /* HealthKitService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +62,8 @@
 		001000002000000000000023 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		001000002000000000000024 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		001000002000000000000025 /* APIConfigurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfigurationView.swift; sourceTree = "<group>"; };
+		001000002000000000000026 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		001000002000000000000027 /* MacroHunt.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MacroHunt.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +94,7 @@
 				001000004000000000000004 /* Services */,
 				001000004000000000000005 /* Utilities */,
 				001000002000000000000024 /* Assets.xcassets */,
+				001000002000000000000027 /* MacroHunt.entitlements */,
 			);
 			path = MacroHunt;
 			sourceTree = "<group>";
@@ -122,6 +126,7 @@
 				001000002000000000000016 /* CraftAPI.swift */,
 				001000002000000000000017 /* ClaudeAPI.swift */,
 				001000002000000000000018 /* MealRepository.swift */,
+				001000002000000000000026 /* HealthKitService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -287,6 +292,7 @@
 				001000001000000000000022 /* APIError.swift in Sources */,
 				001000001000000000000023 /* DesignSystem.swift in Sources */,
 				001000001000000000000025 /* APIConfigurationView.swift in Sources */,
+				001000001000000000000026 /* HealthKitService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,12 +427,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MacroHunt/MacroHunt.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "MacroHunt reads weight, activity, and heart data to give you context-aware nutrition insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "MacroHunt saves the meals you log to Apple Health as calories and macros.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -451,12 +460,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MacroHunt/MacroHunt.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "MacroHunt reads weight, activity, and heart data to give you context-aware nutrition insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "MacroHunt saves the meals you log to Apple Health as calories and macros.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "MacroHunt needs photo library access to select meal photos for nutritional analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
