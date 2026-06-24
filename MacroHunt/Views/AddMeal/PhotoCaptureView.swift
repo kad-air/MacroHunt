@@ -52,9 +52,29 @@ struct PhotoCaptureView: View {
     @State private var photoPickerItems: [PhotosPickerItem] = []
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Display selected photos
-            if !selectedPhotos.isEmpty {
+        VStack(spacing: 10) {
+            if selectedPhotos.isEmpty {
+                // Empty slot prompt
+                VStack(spacing: 7) {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 26, weight: .light))
+                        .foregroundStyle(Theme.ink2)
+                    Text("Add up to 5 photos — or just describe it below")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.ink3)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 118)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Theme.chip)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(Theme.hair, style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                        )
+                )
+            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(selectedPhotos.indices, id: \.self) { index in
@@ -63,12 +83,10 @@ struct PhotoCaptureView: View {
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                                 Button {
-                                    withAnimation {
-                                        _ = selectedPhotos.remove(at: index)
-                                    }
+                                    withAnimation { _ = selectedPhotos.remove(at: index) }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.title3)
@@ -78,42 +96,25 @@ struct PhotoCaptureView: View {
                             }
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 2)
                 }
                 .frame(height: 110)
             }
 
-            // Add photo buttons
-            HStack(spacing: 16) {
+            // Take photo / Choose photo
+            HStack(spacing: 8) {
                 Button {
                     showingCamera = true
                 } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .font(.title2)
-                        Text("Camera")
-                            .font(.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.primary.opacity(0.05))
-                    .cornerRadius(12)
+                    photoActionLabel(icon: "camera", title: "Take photo")
                 }
+                .buttonStyle(.plain)
 
                 PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 5, matching: .images) {
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.title2)
-                        Text("Library")
-                            .font(.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.primary.opacity(0.05))
-                    .cornerRadius(12)
+                    photoActionLabel(icon: "photo.on.rectangle", title: "Choose photo")
                 }
+                .buttonStyle(.plain)
             }
-            .foregroundColor(.primary)
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraView(image: $capturedImage)
@@ -140,6 +141,21 @@ struct PhotoCaptureView: View {
                 }
             }
         }
+    }
+
+    private func photoActionLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon).font(.system(size: 16))
+            Text(title).font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(Theme.ink)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Theme.chip)
+                .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Theme.hair, lineWidth: 1))
+        )
     }
 }
 

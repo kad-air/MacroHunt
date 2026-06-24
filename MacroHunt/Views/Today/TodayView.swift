@@ -8,187 +8,195 @@ struct TodayView: View {
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
 
+    /// Opens the Add-meal sheet (owned by `MainTabView`, shared with the center "+").
+    var onAddMeal: () -> Void = {}
+
+    @StateObject private var reflection = ReflectionViewModel()
+    @State private var showReflection = false
+    @State private var deleteError: String?
+
     private var todayMeals: [Meal] {
         let startOfToday = Calendar.current.startOfDay(for: Date())
-        return allMeals.filter { $0.date >= startOfToday }
+        return allMeals.filter { $0.date >= startOfToday }.sorted { $0.date < $1.date }
     }
-
-    @State private var showingAddMeal = false
-    @State private var deleteError: String?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 LiquidGlassBackground()
-                    .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Today")
-                                .font(.system(size: 34, weight: .bold, design: .rounded))
-                            Text(Date(), style: .date)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 0) {
+                        header
+                            .padding(.top, 8)
+                            .padding(.bottom, 18)
 
-                        // Summary Card
                         summaryCard
-                            .padding(.horizontal)
 
-                        // Meals List
+                        if credentials.dailyReflectionEnabled {
+                            SectionHeader(title: "Today")
+                                .padding(.horizontal, 4)
+                                .padding(.top, 30)
+                                .padding(.bottom, 13)
+                            reflectionCard
+                        }
+
+                        SectionHeader(title: "Meals · \(todayMeals.count) logged")
+                            .padding(.horizontal, 4)
+                            .padding(.top, 30)
+                            .padding(.bottom, 13)
+
                         if todayMeals.isEmpty {
                             emptyState
                         } else {
-                            mealsSection
+                            ForEach(todayMeals) { meal in
+                                MealCard(meal: meal)
+                                    .padding(.bottom, 10)
+                                    .contextMenu {
+                                        Button(role: .destructive) { deleteMeal(meal) } label: {
+                                            Label("Delete meal", systemImage: "trash")
+                                        }
+                                    }
+                            }
                         }
-                    }
-                    .padding(.vertical)
-                }
 
-                // Floating Add Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        addButton
+                        logNextRow
+                            .padding(.top, 2)
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 110)
                 }
-                .padding()
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingAddMeal) {
-                AddMealView()
+            .task(id: reflectionTaskKey) {
+                await reflection.ensureLoaded(modelContext: modelContext, credentials: credentials)
+            }
+            .sheet(isPresented: $showReflection) {
+                ReflectionSheet(reflection: reflection, modelContext: modelContext, credentials: credentials)
             }
             .alert("Delete Failed", isPresented: Binding(
                 get: { deleteError != nil },
                 set: { if !$0 { deleteError = nil } }
             )) {
-                Button("OK") {
-                    deleteError = nil
-                }
+                Button("OK") { deleteError = nil }
             } message: {
                 Text(deleteError ?? "Unknown error")
             }
         }
     }
 
-    // MARK: - Summary Card
+    /// Re-run the reflection check when the day rolls over, when reflections get toggled,
+    /// or when the key is first added. Today's meal count nudges it to refresh after logging.
+    private var reflectionTaskKey: String {
+        "\(Self.dayKey(Date()))-\(credentials.dailyReflectionEnabled)-\(credentials.anthropicKey.isEmpty)-\(todayMeals.count)"
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+            Text(greeting)
+                .font(.system(size: 29, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 0..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        default: return "Good evening"
+        }
+    }
+
+    // MARK: - Summary card
 
     private var summaryCard: some View {
-        GlassCard {
-            VStack(spacing: 16) {
-                // Calorie progress
-                let totalCalories = todayMeals.reduce(0) { $0 + $1.calories }
-                let goal = credentials.dailyCalorieGoal
+        let eaten = todayMeals.reduce(0) { $0 + $1.calories }
+        let protein = todayMeals.reduce(0.0) { $0 + $1.protein }
+        let carbs = todayMeals.reduce(0.0) { $0 + $1.carbs }
+        let fat = todayMeals.reduce(0.0) { $0 + $1.fat }
+        let goal = credentials.dailyCalorieGoal
 
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("\(totalCalories)")
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                        Text("/ \(goal) kcal")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
+        return GlassCard {
+            VStack(spacing: 0) {
+                CalorieRing(eaten: eaten, goal: goal)
 
-                    // Progress bar
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.orange.opacity(0.2))
-                                .frame(height: 12)
+                Text("\(eaten.formatted()) eaten · \(goal.formatted()) goal")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
+                    .padding(.top, 13)
 
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.orange)
-                                .frame(width: max(0, min(goal > 0 ? CGFloat(totalCalories) / CGFloat(goal) * geometry.size.width : 0, geometry.size.width)), height: 12)
-                        }
-                    }
-                    .frame(height: 12)
+                HStack(alignment: .top, spacing: 15) {
+                    MacroTrack(name: "Protein", value: protein, goal: credentials.proteinGoal, color: Theme.protein)
+                    MacroTrack(name: "Carbs", value: carbs, goal: credentials.carbsGoal, color: Theme.carbs)
+                    MacroTrack(name: "Fat", value: fat, goal: credentials.fatGoal, color: Theme.fat)
                 }
-
-                Divider()
-
-                // Macro rings
-                HStack(spacing: 20) {
-                    let totalProtein = todayMeals.reduce(0.0) { $0 + $1.protein }
-                    let totalCarbs = todayMeals.reduce(0.0) { $0 + $1.carbs }
-                    let totalFat = todayMeals.reduce(0.0) { $0 + $1.fat }
-
-                    MacroRingView(value: totalProtein, goal: Double(credentials.proteinGoal), color: .red, label: "Protein", unit: "g")
-                    MacroRingView(value: totalCarbs, goal: Double(credentials.carbsGoal), color: .blue, label: "Carbs", unit: "g")
-                    MacroRingView(value: totalFat, goal: Double(credentials.fatGoal), color: .yellow, label: "Fat", unit: "g")
-                }
+                .padding(.top, 22)
             }
         }
     }
 
-    // MARK: - Meals Section
+    // MARK: - Reflection coach card
 
-    private var mealsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Meals")
-                .font(.headline)
-                .padding(.horizontal)
-
-            List {
-                ForEach(todayMeals) { meal in
-                    MealCard(meal: meal)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                deleteMeal(meal)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .scrollDisabled(true)
-            .frame(minHeight: CGFloat(todayMeals.count) * 130)
+    @ViewBuilder
+    private var reflectionCard: some View {
+        Button {
+            if reflection.current != nil { showReflection = true }
+        } label: {
+            CoachCardContent(state: reflection.state, hasKey: !credentials.anthropicKey.isEmpty)
         }
+        .buttonStyle(.plain)
+        .disabled(reflection.current == nil)
     }
 
-    // MARK: - Empty State
+    // MARK: - Meals
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "fork.knife.circle")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
-
+        VStack(spacing: 10) {
+            Image(systemName: "fork.knife")
+                .font(.system(size: 30))
+                .foregroundStyle(Theme.ink3)
             Text("No meals logged yet")
-                .font(.headline)
-                .foregroundColor(.secondary)
-
-            Text("Tap + to add your first meal")
-                .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.8))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+            Text("Tap + to log your first meal of the day")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.ink3)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, 30)
     }
 
-    // MARK: - Add Button
-
-    private var addButton: some View {
-        Button {
-            showingAddMeal = true
-        } label: {
-            Image(systemName: "plus")
-                .font(.title2.weight(.semibold))
-                .foregroundColor(.white)
-                .frame(width: 56, height: 56)
-                .background(Color.accentColor)
-                .clipShape(Circle())
-                .shadow(color: Color.accentColor.opacity(0.4), radius: 8, y: 4)
+    private var logNextRow: some View {
+        Button(action: onAddMeal) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                Text(nextMealLabel)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(Theme.ink2)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Theme.hair, style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+            )
         }
+        .buttonStyle(.plain)
+    }
+
+    private var nextMealLabel: String {
+        let logged = Set(todayMeals.map { $0.mealType })
+        for type in [MealType.breakfast, .lunch, .dinner] where !logged.contains(type) {
+            return "Log \(type.rawValue.lowercased())"
+        }
+        return "Log a snack"
     }
 
     // MARK: - Actions
@@ -199,11 +207,416 @@ struct TodayView: View {
                 let repository = MealRepository(modelContext: modelContext, credentials: credentials)
                 try await repository.deleteMealWithSync(meal)
             } catch {
-                await MainActor.run {
-                    deleteError = error.localizedDescription
+                await MainActor.run { deleteError = error.localizedDescription }
+            }
+        }
+    }
+
+    static func dayKey(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Coach card content
+
+/// The hero "Daily reflection" card on Today. Renders a soft glow, a kicker, and a one-line
+/// preview that adapts to the reflection's state (loading / ready / failed / no key).
+private struct CoachCardContent: View {
+    let state: ReflectionViewModel.State
+    let hasKey: Bool
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Soft accent glow in the corner
+            Circle()
+                .fill(RadialGradient(colors: [Theme.accent.opacity(0.22), .clear], center: .center, startRadius: 0, endRadius: 110))
+                .frame(width: 200, height: 200)
+                .offset(x: 60, y: -60)
+                .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 7) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Daily reflection")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.3)
+                }
+                .foregroundStyle(Theme.accent)
+
+                Text(title)
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 12)
+
+                if let preview {
+                    Text(preview)
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(Theme.ink2)
+                        .lineLimit(2)
+                        .padding(.top, 9)
+                }
+
+                if showCTA {
+                    HStack(spacing: 5) {
+                        if case .loading = state {
+                            ProgressView().controlSize(.small).tint(Theme.accent)
+                            Text("Reflecting on your week…")
+                        } else {
+                            Text(ctaText)
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.top, 15)
                 }
             }
         }
+        .padding(22)
+        .glassContainer(cornerRadius: 26)
+    }
+
+    private var title: String {
+        switch state {
+        case .ready(let r): return r.headline
+        case .loading: return "Looking over your last few days…"
+        case .failed: return "Reflection unavailable right now"
+        case .idle:
+            return hasKey ? "Your daily reflection will appear here" : "Add AI analysis to unlock reflections"
+        }
+    }
+
+    private var preview: String? {
+        switch state {
+        case .ready(let r): return r.observations.first
+        case .failed(let message): return message
+        case .idle where !hasKey: return "Configure your Anthropic key in Settings to get a gentle daily read on your trends."
+        default: return nil
+        }
+    }
+
+    private var showCTA: Bool {
+        switch state {
+        case .ready, .loading: return true
+        default: return false
+        }
+    }
+
+    private var ctaText: String { "Read the full reflection" }
+}
+
+// MARK: - Reflection view model
+
+/// Owns generating + caching the daily reflection. Best-effort: a denied key or empty data
+/// just leaves the card in an idle/failed state — it never blocks the rest of Today.
+@MainActor
+final class ReflectionViewModel: ObservableObject {
+    enum State: Equatable {
+        case idle
+        case loading
+        case ready(CoachingReflection)
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .idle
+
+    private var loadedDay: String?
+
+    var current: CoachingReflection? {
+        if case .ready(let r) = state { return r }
+        return nil
+    }
+
+    private static let cacheDayKey = "reflection.cache.day"
+    private static let cacheJSONKey = "reflection.cache.json"
+
+    /// Loads today's reflection: from the in-memory/disk cache if present, otherwise
+    /// generates a fresh one (only when reflections are on and a key is configured).
+    func ensureLoaded(modelContext: ModelContext, credentials: CredentialsManager) async {
+        guard credentials.dailyReflectionEnabled else {
+            state = .idle
+            return
+        }
+        let today = TodayView.dayKey(Date())
+
+        // Already have today's in this session.
+        if loadedDay == today, case .ready = state { return }
+
+        // Disk cache for today (survives relaunch, avoids re-billing the API).
+        if let cached = Self.readCache(forDay: today) {
+            loadedDay = today
+            state = .ready(cached)
+            return
+        }
+
+        guard !credentials.anthropicKey.isEmpty else {
+            state = .idle
+            return
+        }
+        await generate(force: false, modelContext: modelContext, credentials: credentials)
+    }
+
+    /// Generates a new reflection. `force` bypasses the "already loaded today" guard for the
+    /// Regenerate button.
+    func generate(force: Bool, modelContext: ModelContext, credentials: CredentialsManager) async {
+        guard !credentials.anthropicKey.isEmpty else {
+            state = .idle
+            return
+        }
+        if case .loading = state, !force { return }
+
+        state = .loading
+        let context = await buildContext(modelContext: modelContext, credentials: credentials)
+        do {
+            let client = ClaudeAPI(apiKey: credentials.anthropicKey)
+            let result = try await client.generateReflection(context: context)
+            let today = TodayView.dayKey(Date())
+            loadedDay = today
+            Self.writeCache(result, forDay: today)
+            state = .ready(result)
+        } catch {
+            state = .failed(friendly(error))
+        }
+    }
+
+    private func friendly(_ error: Error) -> String {
+        if let apiError = error as? APIError { return apiError.localizedDescription }
+        return error.localizedDescription
+    }
+
+    // MARK: Context snapshot
+
+    private func buildContext(modelContext: ModelContext, credentials: CredentialsManager) async -> String {
+        let repo = MealRepository(modelContext: modelContext, credentials: credentials)
+        var lines: [String] = []
+
+        // Goals
+        lines.append("GOALS")
+        lines.append("- Daily calorie goal: \(credentials.dailyCalorieGoal) kcal")
+        lines.append("- Macro goals: protein \(credentials.proteinGoal) g, carbs \(credentials.carbsGoal) g, fat \(credentials.fatGoal) g (\(credentials.macroSplit.displayName) split)")
+        if credentials.hasWeightGoal {
+            lines.append("- Weight goal: \(String(format: "%.1f", credentials.weightGoalKg)) kg (\(credentials.weightGoalDirection.displayName.lowercased()))")
+        }
+
+        // Today + week intake
+        if let today = try? repo.dailyTotals(for: Date()) {
+            lines.append("\nTODAY")
+            lines.append("- Eaten so far: \(today.calories) kcal · P \(Int(today.protein)) g · C \(Int(today.carbs)) g · F \(Int(today.fat)) g")
+        }
+        if let week = try? repo.weeklyAverages() {
+            lines.append("\nLAST 7 DAYS (averages)")
+            lines.append("- Calories: \(Int(week.avgCalories)) kcal/day")
+            lines.append("- Protein: \(Int(week.avgProtein)) g · Carbs: \(Int(week.avgCarbs)) g · Fat: \(Int(week.avgFat)) g")
+        }
+        if let daily = try? repo.dailyCaloriesForRange(days: 7) {
+            let series = daily.map { "\($0.calories)" }.joined(separator: ", ")
+            lines.append("- Daily calories (oldest→newest): \(series)")
+        }
+
+        // Health (best-effort)
+        let hk = HealthKitService.shared
+        if hk.isHealthDataAvailable {
+            var health: [String] = []
+            if let weight = await hk.latestBodyMass() {
+                health.append("- Latest weight: \(String(format: "%.1f", weight.kilograms)) kg")
+            }
+            let active = await hk.dailyActiveEnergy(days: 7)
+            if !active.isEmpty {
+                let avg = active.map(\.value).reduce(0, +) / Double(active.count)
+                health.append("- Avg active energy: \(Int(avg)) kcal/day")
+            }
+            let steps = await hk.dailySteps(days: 7)
+            if !steps.isEmpty {
+                let avg = steps.map(\.value).reduce(0, +) / Double(steps.count)
+                health.append("- Avg steps: \(Int(avg))/day")
+            }
+            if let rhr = await hk.latestRestingHeartRate() {
+                health.append("- Resting heart rate: \(Int(rhr.value)) bpm")
+            }
+            if let hrv = await hk.latestHRV() {
+                health.append("- HRV (SDNN): \(Int(hrv.value)) ms")
+            }
+            if !health.isEmpty {
+                lines.append("\nAPPLE HEALTH")
+                lines.append(contentsOf: health)
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: Cache
+
+    private static func readCache(forDay day: String) -> CoachingReflection? {
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: cacheDayKey) == day,
+              let data = defaults.data(forKey: cacheJSONKey),
+              let reflection = try? JSONDecoder().decode(CoachingReflection.self, from: data) else {
+            return nil
+        }
+        return reflection
+    }
+
+    private static func writeCache(_ reflection: CoachingReflection, forDay day: String) {
+        let defaults = UserDefaults.standard
+        if let data = try? JSONEncoder().encode(reflection) {
+            defaults.set(day, forKey: cacheDayKey)
+            defaults.set(data, forKey: cacheJSONKey)
+        }
+    }
+}
+
+// MARK: - Reflection sheet
+
+/// The full daily reflection: observations, one small idea, and an encouraging close, with a
+/// regenerate affordance and a clear not-medical-advice disclaimer.
+struct ReflectionSheet: View {
+    @ObservedObject var reflection: ReflectionViewModel
+    let modelContext: ModelContext
+    let credentials: CredentialsManager
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let observationColors: [Color] = [Theme.accent, Theme.protein, Theme.carbs, Theme.fat]
+
+    var body: some View {
+        ZStack {
+            LiquidGlassBackground()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+
+                    if let r = reflection.current {
+                        Text(r.headline)
+                            .font(.system(size: 26, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 20)
+
+                        SectionHeader(title: "What I noticed")
+                            .padding(.top, 24)
+                            .padding(.bottom, 16)
+
+                        ForEach(Array(r.observations.enumerated()), id: \.offset) { index, text in
+                            HStack(alignment: .top, spacing: 13) {
+                                Circle()
+                                    .fill(observationColors[index % observationColors.count])
+                                    .frame(width: 8, height: 8)
+                                    .padding(.top, 7)
+                                Text(text)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Theme.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.bottom, 16)
+                        }
+
+                        ideaCard(r.suggestion)
+
+                        Text(r.encouragement)
+                            .font(.system(size: 15.5))
+                            .foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 14)
+                            .overlay(alignment: .leading) {
+                                Rectangle().fill(Theme.accent).frame(width: 2)
+                            }
+                            .padding(.top, 22)
+
+                        footer
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 40)
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var header: some View {
+        HStack(spacing: 11) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Theme.accentSoft)
+                .frame(width: 36, height: 36)
+                .overlay {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Daily reflection")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Text("From your logs & Apple Health")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.ink2)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.ink2)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Theme.chip))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 12)
+    }
+
+    private func ideaCard(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "lightbulb.fill").font(.system(size: 12))
+                Text("One small idea")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.1)
+            }
+            .foregroundStyle(Theme.accent)
+            Text(text)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.accentSoft))
+        .padding(.top, 8)
+    }
+
+    private var footer: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text("Reflections are drawn from your own logs and Health data — not medical advice.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.ink3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                Task { await reflection.generate(force: true, modelContext: modelContext, credentials: credentials) }
+            } label: {
+                HStack(spacing: 6) {
+                    if case .loading = reflection.state {
+                        ProgressView().controlSize(.small).tint(Theme.accent)
+                    } else {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 13, weight: .semibold))
+                    }
+                    Text("Regenerate").font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 24)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.hair).frame(height: 1) }
+        .padding(.top, 24)
     }
 }
 

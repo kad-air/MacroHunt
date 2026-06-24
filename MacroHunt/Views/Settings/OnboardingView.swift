@@ -26,7 +26,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<4) { step in
                         Capsule()
-                            .fill(step <= currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
+                            .fill(step <= currentStep ? Theme.accent : Theme.ink3)
                             .frame(height: 4)
                     }
                 }

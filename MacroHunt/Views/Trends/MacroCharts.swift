@@ -16,7 +16,7 @@ struct CalorieTrendChart: View {
         Chart {
             // Goal line
             RuleMark(y: .value("Goal", goal))
-                .foregroundStyle(.orange.opacity(0.5))
+                .foregroundStyle(Theme.accent.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
 
             // Data points
@@ -25,10 +25,10 @@ struct CalorieTrendChart: View {
                     x: .value("Date", item.date, unit: .day),
                     y: .value("Calories", item.calories)
                 )
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.accent)
                 .symbol {
                     Circle()
-                        .fill(.orange)
+                        .fill(Theme.accent)
                         .frame(width: 8, height: 8)
                 }
 
@@ -38,7 +38,7 @@ struct CalorieTrendChart: View {
                 )
                 .foregroundStyle(
                     .linearGradient(
-                        colors: [.orange.opacity(0.3), .orange.opacity(0.05)],
+                        colors: [Theme.accent.opacity(0.3), Theme.accent.opacity(0.05)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -81,9 +81,9 @@ struct MacroBreakdownChart: View {
 
     private var data: [(name: String, value: Double, color: Color)] {
         [
-            ("Protein", protein, .red),
-            ("Carbs", carbs, .blue),
-            ("Fat", fat, .yellow)
+            ("Protein", protein, Theme.protein),
+            ("Carbs", carbs, Theme.carbs),
+            ("Fat", fat, Theme.fat)
         ]
     }
 
@@ -178,7 +178,7 @@ struct EnergyBalanceChart: View {
                         x: .value("Date", item.date, unit: .day),
                         y: .value("Eaten", item.intake)
                     )
-                    .foregroundStyle(.orange.opacity(0.7))
+                    .foregroundStyle(Theme.accent.opacity(0.85))
                     .cornerRadius(3)
                 }
 
@@ -187,10 +187,10 @@ struct EnergyBalanceChart: View {
                         x: .value("Date", item.date, unit: .day),
                         y: .value("Burned", item.expenditure)
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.ink2)
                     .interpolationMethod(.catmullRom)
                     .symbol {
-                        Circle().fill(.green).frame(width: 6, height: 6)
+                        Circle().fill(Theme.ink2).frame(width: 6, height: 6)
                     }
                 }
             }
@@ -216,8 +216,8 @@ struct EnergyBalanceChart: View {
             .frame(height: 200)
 
             HStack(spacing: 16) {
-                LegendDot(color: .orange, label: "Eaten")
-                LegendDot(color: .green, label: "Burned")
+                LegendDot(color: Theme.accent, label: "Eaten")
+                LegendDot(color: Theme.ink2, label: "Burned")
             }
             .font(.caption2)
         }
@@ -245,7 +245,7 @@ struct WeightTrendChart: View {
         Chart {
             if let goal {
                 RuleMark(y: .value("Target", goal))
-                    .foregroundStyle(.blue.opacity(0.6))
+                    .foregroundStyle(Theme.carbs.opacity(0.7))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
             }
 
@@ -254,10 +254,10 @@ struct WeightTrendChart: View {
                     x: .value("Date", item.date),
                     y: .value("Weight", item.value)
                 )
-                .foregroundStyle(.purple)
+                .foregroundStyle(Theme.accent)
                 .interpolationMethod(.catmullRom)
                 .symbol {
-                    Circle().fill(.purple).frame(width: 6, height: 6)
+                    Circle().fill(Theme.accent).frame(width: 6, height: 6)
                 }
             }
         }
@@ -293,7 +293,7 @@ struct LegendDot: View {
                 .fill(color)
                 .frame(width: 8, height: 8)
             Text(label)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.ink2)
         }
     }
 }
@@ -400,46 +400,42 @@ struct HealthMetricTile: View {
     var tappable: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 0)
-                if tappable {
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.5))
-                }
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title.uppercased())
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.ink2)
+                .lineLimit(1)
 
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(color)
+                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Theme.ink)
+                    .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(unit)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.ink2)
             }
-            .lineLimit(1)
+            .padding(.top, 6)
 
             if trend.count >= 2 {
                 Sparkline(points: trend, color: color)
-                    .frame(height: 26)
+                    .frame(height: 22)
+                    .padding(.top, 8)
             }
 
             if let caption {
                 Text(caption)
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.8))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.ink3)
+                    .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(12)
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.chip))
         .contentShape(Rectangle())
     }
 }
@@ -455,12 +451,12 @@ struct DailyAverageStats: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                StatBox(title: "Avg Calories", value: "\(Int(avgCalories))", unit: "kcal", color: .orange)
-                StatBox(title: "Avg Protein", value: String(format: "%.0f", avgProtein), unit: "g", color: .red)
+                StatBox(title: "Avg Calories", value: "\(Int(avgCalories))", unit: "kcal", color: Theme.accent)
+                StatBox(title: "Avg Protein", value: String(format: "%.0f", avgProtein), unit: "g", color: Theme.protein)
             }
             HStack {
-                StatBox(title: "Avg Carbs", value: String(format: "%.0f", avgCarbs), unit: "g", color: .blue)
-                StatBox(title: "Avg Fat", value: String(format: "%.0f", avgFat), unit: "g", color: .yellow)
+                StatBox(title: "Avg Carbs", value: String(format: "%.0f", avgCarbs), unit: "g", color: Theme.carbs)
+                StatBox(title: "Avg Fat", value: String(format: "%.0f", avgFat), unit: "g", color: Theme.fat)
             }
         }
     }
@@ -474,23 +470,24 @@ private struct StatBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(title.uppercased())
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.ink2)
 
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(color)
+                    .foregroundStyle(color)
+                    .monospacedDigit()
                 Text(unit)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color.primary.opacity(0.05))
-        .cornerRadius(12)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.chip))
     }
 }
 

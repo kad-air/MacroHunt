@@ -17,116 +17,118 @@ struct AddMealView: View {
     @State private var analysisResult: NutritionAnalysis?
     @State private var errorMessage: String?
     @State private var showingReview = false
-
     @State private var isSaving = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                LiquidGlassBackground()
-                    .ignoresSafeArea()
+        ZStack {
+            LiquidGlassBackground()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        if !showingReview {
-                            captureView
-                        } else if let analysis = Binding($analysisResult) {
-                            reviewView(analysis: analysis)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if isAnalyzing {
+                        analyzingView
+                    } else if showingReview, let analysis = Binding($analysisResult) {
+                        reviewView(analysis: analysis)
+                    } else {
+                        captureView
                     }
-                    .padding()
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 40)
             }
-            .navigationTitle(showingReview ? "Review Meal" : "Add Meal")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
 
-                if showingReview {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            saveMeal()
-                        }
-                        .disabled(isSaving)
-                    }
-                }
-            }
-            .overlay {
-                if isAnalyzing {
-                    analyzingOverlay
-                }
-                if isSaving {
-                    savingOverlay
-                }
-            }
-            .alert("Error", isPresented: .constant(errorMessage != nil)) {
-                Button("OK") {
-                    errorMessage = nil
-                }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            if isSaving { savingOverlay }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 
-    // MARK: - Capture View
+    // MARK: - Header
+
+    private func sheetHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.ink)
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.ink2)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Theme.chip))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 12)
+    }
+
+    private func fieldLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 11, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(Theme.ink2)
+    }
+
+    // MARK: - Capture
 
     private var captureView: some View {
-        VStack(spacing: 24) {
-            // Photo Capture
-            GlassCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Meal Photos (Optional)", icon: "camera.fill")
-                    PhotoCaptureView(selectedPhotos: $selectedPhotos)
-                }
+        VStack(alignment: .leading, spacing: 17) {
+            sheetHeader("Add a meal")
+
+            VStack(alignment: .leading, spacing: 9) {
+                fieldLabel("Photos")
+                PhotoCaptureView(selectedPhotos: $selectedPhotos)
+            }
+            .padding(.top, 6)
+
+            VStack(alignment: .leading, spacing: 9) {
+                fieldLabel("Description")
+                TextField("What are you eating?", text: $description, axis: .vertical)
+                    .lineLimit(2...4)
+                    .inputFieldStyle()
             }
 
-            // Description
-            GlassCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Description (Optional)", icon: "text.alignleft")
-                    TextField("What are you eating?", text: $description, axis: .vertical)
-                        .lineLimit(2...4)
-                        .inputFieldStyle()
-                    Text("Add a photo, a description, or both. A detailed description works even without a photo.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 9) {
+                fieldLabel("Meal type")
+                MealTypeSelector(selectedType: $mealType)
             }
 
-            // Meal Type
-            GlassCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Meal Type", icon: "fork.knife")
-                    MealTypeSelector(selectedType: $mealType)
-                }
-            }
-
-            // Date & Time
-            GlassCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Date & Time", icon: "clock.fill")
+            VStack(alignment: .leading, spacing: 9) {
+                fieldLabel("When")
+                HStack {
+                    Image(systemName: "clock").font(.system(size: 15)).foregroundStyle(Theme.ink2)
                     DatePicker("", selection: $mealDate, in: ...Date())
                         .datePickerStyle(.compact)
                         .labelsHidden()
+                    Spacer()
                 }
+                .padding(.vertical, 9)
+                .padding(.horizontal, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .fill(Theme.chip)
+                        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Theme.hair, lineWidth: 1))
+                )
             }
 
-            // Analyze Button
             Button {
                 analyzePhotos()
             } label: {
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                     Text("Analyze with AI")
                 }
             }
             .buttonStyle(PrimaryButtonStyle(isEnabled: canAnalyze))
             .disabled(!canAnalyze)
+            .padding(.top, 4)
         }
     }
 
@@ -135,12 +137,31 @@ struct AddMealView: View {
         !selectedPhotos.isEmpty || !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    // MARK: - Review View
+    // MARK: - Analyzing
+
+    private var analyzingView: some View {
+        VStack(spacing: 15) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(Theme.accent)
+            Text("Analyzing your meal…")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.ink)
+            Text(selectedPhotos.isEmpty ? "Reading your description" : "Reading your photos and description")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.ink2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+    }
+
+    // MARK: - Review
 
     @ViewBuilder
     private func reviewView(analysis: Binding<NutritionAnalysis>) -> some View {
-        VStack(spacing: 24) {
-            // Photo preview
+        VStack(alignment: .leading, spacing: 17) {
+            sheetHeader("Review meal")
+
             if !selectedPhotos.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -149,66 +170,44 @@ struct AddMealView: View {
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
                         }
                     }
                 }
-                .frame(height: 90)
+                .frame(height: 86)
             }
 
-            GlassCard {
-                ReviewMealView(analysis: analysis, mealType: $mealType, notes: $notes)
+            ReviewMealView(analysis: analysis, mealType: $mealType, notes: $notes)
+
+            Button { saveMeal() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark")
+                    Text("Save meal")
+                }
             }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: !isSaving))
+            .disabled(isSaving)
+            .padding(.top, 4)
 
             Button {
                 showingReview = false
                 analysisResult = nil
             } label: {
-                HStack {
-                    Image(systemName: "arrow.counterclockwise")
-                    Text(selectedPhotos.isEmpty ? "Edit Details" : "Retake Photos")
-                }
+                Text(selectedPhotos.isEmpty ? "Edit details" : "Re-analyze")
             }
-            .buttonStyle(.bordered)
-        }
-    }
-
-    // MARK: - Overlays
-
-    private var analyzingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-
-            GlassCard {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Analyzing your meal...")
-                        .font(.headline)
-                    Text("This may take a moment")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(width: 200)
-            }
+            .buttonStyle(GhostButtonStyle())
         }
     }
 
     private var savingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-
-            GlassCard {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Saving meal...")
-                        .font(.headline)
-                }
-                .frame(width: 200)
+            Color.black.opacity(0.4).ignoresSafeArea()
+            VStack(spacing: 16) {
+                ProgressView().controlSize(.large).tint(Theme.accent)
+                Text("Saving meal…").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink)
             }
+            .padding(28)
+            .glassContainer(cornerRadius: 22)
         }
     }
 
@@ -222,21 +221,11 @@ struct AddMealView: View {
         }
 
         isAnalyzing = true
-
         Task {
             do {
-                // Convert images to JPEG data
-                let imageData = selectedPhotos.compactMap { image -> Data? in
-                    image.jpegData(compressionQuality: 0.7)
-                }
-
+                let imageData = selectedPhotos.compactMap { $0.jpegData(compressionQuality: 0.7) }
                 let claude = ClaudeAPI(apiKey: credentials.anthropicKey)
-                let result = try await claude.analyzeMealPhotos(
-                    images: imageData,
-                    description: description,
-                    mealType: mealType
-                )
-
+                let result = try await claude.analyzeMealPhotos(images: imageData, description: description, mealType: mealType)
                 await MainActor.run {
                     analysisResult = result
                     showingReview = true
@@ -253,17 +242,10 @@ struct AddMealView: View {
 
     private func saveMeal() {
         guard let analysis = analysisResult else { return }
-
         isSaving = true
-
         Task {
             do {
-                // Convert photos to data
-                let photoData = selectedPhotos.compactMap { image -> Data? in
-                    image.jpegData(compressionQuality: 0.8)
-                }
-
-                // Create meal object
+                let photoData = selectedPhotos.compactMap { $0.jpegData(compressionQuality: 0.8) }
                 let meal = Meal(
                     name: analysis.mealName,
                     date: mealDate,
@@ -276,11 +258,8 @@ struct AddMealView: View {
                     notes: notes,
                     photoData: photoData
                 )
-
-                // Save to both Craft and local DB (transactional - Craft first)
                 let repository = MealRepository(modelContext: modelContext, credentials: credentials)
                 try await repository.saveMealWithSync(meal)
-
                 await MainActor.run {
                     isSaving = false
                     dismiss()
@@ -298,4 +277,5 @@ struct AddMealView: View {
 #Preview {
     AddMealView()
         .environmentObject(CredentialsManager())
+        .modelContainer(for: Meal.self, inMemory: true)
 }
