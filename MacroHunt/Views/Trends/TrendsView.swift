@@ -17,6 +17,97 @@ enum TimePeriod: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Health Metric Identity (Phase 2)
+
+/// Identifies a read-in Health metric and carries its display metadata + value
+/// formatting, so tiles and the tap-through detail sheet stay in sync. The view-model maps
+/// each case to the right `HealthKitService` series call.
+enum HealthMetricID: String, CaseIterable, Identifiable {
+    case steps, activeEnergy, workouts, restingHR, hrv, vo2Max, cardioRecovery
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .steps: return "Steps"
+        case .activeEnergy: return "Active Energy"
+        case .workouts: return "Workouts"
+        case .restingHR: return "Resting HR"
+        case .hrv: return "HRV"
+        case .vo2Max: return "VO₂ Max"
+        case .cardioRecovery: return "Cardio Recovery"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .steps: return .green
+        case .activeEnergy: return .orange
+        case .workouts: return .pink
+        case .restingHR: return .red
+        case .hrv: return .teal
+        case .vo2Max: return .indigo
+        case .cardioRecovery: return .mint
+        }
+    }
+
+    /// Unit shown on the detail-chart values (matches the bucket aggregation below).
+    var detailUnit: String {
+        switch self {
+        case .steps: return "steps/wk"
+        case .activeEnergy: return "kcal/wk"
+        case .workouts: return "/wk"
+        case .restingHR, .cardioRecovery: return "bpm"
+        case .hrv: return "ms"
+        case .vo2Max: return "ml/kg·min"
+        }
+    }
+
+    /// Describes how the detail buckets are aggregated, shown as a chart subtitle.
+    var bucketSubtitle: String {
+        switch self {
+        case .steps, .activeEnergy: return "Weekly totals"
+        case .workouts: return "Workouts per week"
+        default: return "Weekly average"
+        }
+    }
+
+    func format(_ value: Double) -> String {
+        switch self {
+        case .vo2Max:
+            return String(format: "%.1f", value)
+        case .steps, .activeEnergy:
+            return value.formatted(.number.precision(.fractionLength(0)).grouping(.automatic))
+        default:
+            return "\(Int(value.rounded()))"
+        }
+    }
+}
+
+// MARK: - Trend Range (detail sheet)
+
+enum TrendRange: String, CaseIterable, Identifiable {
+    case threeMonths, sixMonths, year
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .threeMonths: return "3M"
+        case .sixMonths: return "6M"
+        case .year: return "1Y"
+        }
+    }
+
+    var days: Int {
+        switch self {
+        case .threeMonths: return 90
+        case .sixMonths: return 180
+        case .year: return 365
+        }
+    }
+}
+
 // MARK: - Health Trends View Model (Phase 2)
 
 /// Loads the read-in Apple Health data that backs the Trends Health sections. All queries
@@ -39,8 +130,15 @@ final class HealthTrendsViewModel: ObservableObject {
     @Published var vo2Max: (date: Date, value: Double)?
     @Published var cardioRecovery: (date: Date, value: Double)?
 
+    /// Inline glance sparklines per metric (recent weekly buckets). The full long-term
+    /// trend is loaded on demand by the detail sheet via `series(for:days:intervalDays:)`.
+    @Published var sparklines: [HealthMetricID: [Double]] = [:]
+
     @Published var isLoading = false
     @Published var hasLoadedOnce = false
+
+    /// Window for the inline tile sparklines (≈12 weeks of weekly buckets).
+    private let sparklineDays = 84
 
     var hasWeightData: Bool { !weightSeries.isEmpty }
     var hasEnergyData: Bool { !dailyExpenditure.isEmpty }
@@ -64,6 +162,15 @@ final class HealthTrendsViewModel: ObservableObject {
         async let hrvTask = hk.latestHRV()
         async let vo2Task = hk.latestVO2Max()
         async let recoveryTask = hk.latestCardioRecovery()
+
+        // Inline sparklines (fixed recent window, weekly buckets) — independent of the toggle.
+        async let sparkStepsTask = hk.stepsSeries(days: sparklineDays, intervalDays: 7)
+        async let sparkActiveTask = hk.activeEnergySeries(days: sparklineDays, intervalDays: 7)
+        async let sparkWorkoutsTask = hk.workoutCountsSeries(days: sparklineDays, intervalDays: 7)
+        async let sparkRestingTask = hk.restingHeartRateSeries(days: sparklineDays, intervalDays: 7)
+        async let sparkHrvTask = hk.hrvSeries(days: sparklineDays, intervalDays: 7)
+        async let sparkVo2Task = hk.vo2MaxSeries(days: sparklineDays, intervalDays: 7)
+        async let sparkRecoveryTask = hk.cardioRecoverySeries(days: sparklineDays, intervalDays: 7)
 
         let unit = await unitTask
         let samples = await weightTask
@@ -90,8 +197,33 @@ final class HealthTrendsViewModel: ObservableObject {
         vo2Max = await vo2Task
         cardioRecovery = await recoveryTask
 
+        sparklines = [
+            .steps: (await sparkStepsTask).map(\.value),
+            .activeEnergy: (await sparkActiveTask).map(\.value),
+            .workouts: (await sparkWorkoutsTask).map(\.value),
+            .restingHR: (await sparkRestingTask).map(\.value),
+            .hrv: (await sparkHrvTask).map(\.value),
+            .vo2Max: (await sparkVo2Task).map(\.value),
+            .cardioRecovery: (await sparkRecoveryTask).map(\.value)
+        ]
+
         isLoading = false
         hasLoadedOnce = true
+    }
+
+    /// Long-term series for the tap-through detail sheet. Switches over the metric so the
+    /// view layer never touches HealthKit types. Weekly buckets keep long ranges readable.
+    func series(for metric: HealthMetricID, days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        let hk = HealthKitService.shared
+        switch metric {
+        case .steps: return await hk.stepsSeries(days: days, intervalDays: intervalDays)
+        case .activeEnergy: return await hk.activeEnergySeries(days: days, intervalDays: intervalDays)
+        case .workouts: return await hk.workoutCountsSeries(days: days, intervalDays: intervalDays)
+        case .restingHR: return await hk.restingHeartRateSeries(days: days, intervalDays: intervalDays)
+        case .hrv: return await hk.hrvSeries(days: days, intervalDays: intervalDays)
+        case .vo2Max: return await hk.vo2MaxSeries(days: days, intervalDays: intervalDays)
+        case .cardioRecovery: return await hk.cardioRecoverySeries(days: days, intervalDays: intervalDays)
+        }
     }
 }
 
@@ -106,6 +238,7 @@ struct TrendsView: View {
     @State private var selectedPeriod: TimePeriod = .week
     @State private var isConnecting = false
     @State private var connectMessage: String?
+    @State private var selectedMetric: HealthMetricID?
 
     private let calendar = Calendar.current
 
@@ -186,6 +319,9 @@ struct TrendsView: View {
             .navigationBarHidden(true)
             .task(id: selectedPeriod) {
                 await health.load(days: selectedPeriod.days)
+            }
+            .sheet(item: $selectedMetric) { metric in
+                HealthMetricDetailView(metric: metric, health: health)
             }
         }
     }
@@ -389,20 +525,22 @@ struct TrendsView: View {
         }
     }
 
+    private let metricColumns = [GridItem(.flexible()), GridItem(.flexible())]
+
     private var activitySection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Activity", icon: "figure.walk")
 
-                HStack(spacing: 12) {
+                LazyVGrid(columns: metricColumns, spacing: 12) {
                     if health.avgSteps > 0 {
-                        HealthMetricTile(title: "Avg Steps", value: "\(Int(health.avgSteps.rounded()))", unit: "/day", caption: nil, color: .green)
+                        metricTile(.steps, value: "\(Int(health.avgSteps.rounded()))", unit: "/day", caption: nil)
                     }
                     if health.avgActiveEnergy > 0 {
-                        HealthMetricTile(title: "Avg Active", value: "\(Int(health.avgActiveEnergy.rounded()))", unit: "kcal/day", caption: nil, color: .orange)
+                        metricTile(.activeEnergy, value: "\(Int(health.avgActiveEnergy.rounded()))", unit: "kcal/day", caption: nil)
                     }
                     if health.workoutCount > 0 {
-                        HealthMetricTile(title: "Workouts", value: "\(health.workoutCount)", unit: selectedPeriod == .week ? "this wk" : "30 days", caption: nil, color: .pink)
+                        metricTile(.workouts, value: "\(health.workoutCount)", unit: selectedPeriod == .week ? "this wk" : "30 days", caption: nil)
                     }
                 }
             }
@@ -414,21 +552,50 @@ struct TrendsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Cardio Vitals", icon: "heart.fill")
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(columns: metricColumns, spacing: 12) {
                     if let hr = health.restingHR {
-                        HealthMetricTile(title: "Resting HR", value: "\(Int(hr.value.rounded()))", unit: "bpm", caption: asOf(hr.date), color: .red)
+                        metricTile(.restingHR, value: "\(Int(hr.value.rounded()))", unit: "bpm", caption: asOf(hr.date))
                     }
                     if let v = health.hrv {
-                        HealthMetricTile(title: "HRV", value: "\(Int(v.value.rounded()))", unit: "ms", caption: asOf(v.date), color: .teal)
+                        metricTile(.hrv, value: "\(Int(v.value.rounded()))", unit: "ms", caption: asOf(v.date))
                     }
                     if let v = health.vo2Max {
-                        HealthMetricTile(title: "VO₂ Max", value: String(format: "%.1f", v.value), unit: "ml/kg·min", caption: asOf(v.date), color: .indigo)
+                        metricTile(.vo2Max, value: String(format: "%.1f", v.value), unit: "ml/kg·min", caption: asOf(v.date))
                     }
                     if let r = health.cardioRecovery {
-                        HealthMetricTile(title: "Cardio Recovery", value: "\(Int(r.value.rounded()))", unit: "bpm", caption: asOf(r.date), color: .mint)
+                        metricTile(.cardioRecovery, value: "\(Int(r.value.rounded()))", unit: "bpm", caption: asOf(r.date))
                     }
                 }
             }
+        }
+    }
+
+    /// A tappable metric tile: headline value + inline sparkline, opening the long-term
+    /// detail sheet on tap. Title/color come from the metric so the tile and sheet match.
+    private func metricTile(_ metric: HealthMetricID, value: String, unit: String, caption: String?) -> some View {
+        Button {
+            selectedMetric = metric
+        } label: {
+            HealthMetricTile(
+                title: tileTitle(metric),
+                value: value,
+                unit: unit,
+                caption: caption,
+                color: metric.color,
+                trend: health.sparklines[metric] ?? [],
+                tappable: true
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Tile headers use short "Avg …" labels for the period-averaged activity stats; the
+    /// detail sheet uses the metric's full name.
+    private func tileTitle(_ metric: HealthMetricID) -> String {
+        switch metric {
+        case .steps: return "Avg Steps"
+        case .activeEnergy: return "Avg Active"
+        default: return metric.title
         }
     }
 
@@ -506,6 +673,107 @@ struct TrendsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+    }
+}
+
+// MARK: - Health Metric Detail (Phase 2)
+
+/// The "tap away" long-term trend for a single Health metric: a range picker (3M/6M/1Y), a
+/// full trend chart, and a summary (latest / average / low / high). Loads on demand via the
+/// shared view-model so it never touches HealthKit types directly.
+struct HealthMetricDetailView: View {
+    let metric: HealthMetricID
+    @ObservedObject var health: HealthTrendsViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var range: TrendRange = .sixMonths
+    @State private var series: [(date: Date, value: Double)] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LiquidGlassBackground()
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Picker("Range", selection: $range) {
+                            ForEach(TrendRange.allCases) { range in
+                                Text(range.label).tag(range)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(metric.bucketSubtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                if series.count >= 2 {
+                                    MetricTrendChart(data: series, color: metric.color)
+                                        .frame(height: 220)
+                                } else if isLoading {
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 50)
+                                } else {
+                                    Text("Not enough data in this range yet.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 50)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        if !series.isEmpty {
+                            summaryCard
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+            }
+            .navigationTitle(metric.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .task(id: range) { await load() }
+        }
+    }
+
+    private var summaryCard: some View {
+        let values = series.map(\.value)
+        let latest = values.last ?? 0
+        let average = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        let low = values.min() ?? 0
+        let high = values.max() ?? 0
+
+        return GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Summary", icon: "function")
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    HealthMetricTile(title: "Latest", value: metric.format(latest), unit: metric.detailUnit, caption: nil, color: metric.color)
+                    HealthMetricTile(title: "Average", value: metric.format(average), unit: metric.detailUnit, caption: nil, color: metric.color)
+                    HealthMetricTile(title: "Low", value: metric.format(low), unit: metric.detailUnit, caption: nil, color: metric.color)
+                    HealthMetricTile(title: "High", value: metric.format(high), unit: metric.detailUnit, caption: nil, color: metric.color)
+                }
+            }
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        series = await health.series(for: metric, days: range.days, intervalDays: 7)
+        isLoading = false
     }
 }
 

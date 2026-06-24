@@ -262,6 +262,12 @@ struct WeightTrendChart: View {
             }
         }
         .chartYScale(domain: yDomain)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            }
+        }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisGridLine()
@@ -292,31 +298,136 @@ struct LegendDot: View {
     }
 }
 
+// MARK: - Sparkline (Phase 2)
+
+/// Minimal axis-less line+area used inside metric tiles for a glanceable recent trend.
+/// The full long-term chart is one tap away in `MetricTrendChart`.
+struct Sparkline: View {
+    let points: [Double]
+    let color: Color
+
+    private var indexed: [(index: Int, value: Double)] {
+        points.enumerated().map { (index: $0.offset, value: $0.element) }
+    }
+
+    private var yDomain: ClosedRange<Double> {
+        guard let lo = points.min(), let hi = points.max() else { return 0...1 }
+        if lo == hi { return (lo - 1)...(hi + 1) }
+        let pad = (hi - lo) * 0.2
+        return (lo - pad)...(hi + pad)
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(indexed, id: \.index) { item in
+                LineMark(x: .value("i", item.index), y: .value("v", item.value))
+                    .foregroundStyle(color)
+                    .interpolationMethod(.catmullRom)
+
+                AreaMark(x: .value("i", item.index), y: .value("v", item.value))
+                    .foregroundStyle(.linearGradient(
+                        colors: [color.opacity(0.25), color.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ))
+                    .interpolationMethod(.catmullRom)
+            }
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartYScale(domain: yDomain)
+        .chartLegend(.hidden)
+    }
+}
+
+// MARK: - Metric Trend Chart (Phase 2 — detail)
+
+/// Full long-term trend for a single Health metric, shown in the tap-through detail sheet.
+struct MetricTrendChart: View {
+    let data: [(date: Date, value: Double)]
+    let color: Color
+
+    private var yDomain: ClosedRange<Double> {
+        let values = data.map(\.value)
+        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        if lo == hi { return (lo - 1)...(hi + 1) }
+        let pad = (hi - lo) * 0.15
+        return (max(0, lo - pad))...(hi + pad)
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(data, id: \.date) { item in
+                LineMark(x: .value("Date", item.date), y: .value("Value", item.value))
+                    .foregroundStyle(color)
+                    .interpolationMethod(.catmullRom)
+
+                AreaMark(x: .value("Date", item.date), y: .value("Value", item.value))
+                    .foregroundStyle(.linearGradient(
+                        colors: [color.opacity(0.25), color.opacity(0.04)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ))
+                    .interpolationMethod(.catmullRom)
+            }
+        }
+        .chartYScale(domain: yDomain)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                AxisGridLine()
+                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading)
+        }
+    }
+}
+
 // MARK: - Health Metric Tile (Phase 2)
 
 /// Compact stat tile for read-in Health values (activity + cardio). Shows a value with
-/// unit and an optional caption (e.g. the measurement date). Neutral by design — no
-/// "good/bad" framing, matching the app's coaching ethos.
+/// unit, an optional inline sparkline, and an optional caption (e.g. the measurement
+/// date). When `tappable`, a chevron hints that the full long-term trend is one tap away.
+/// Neutral by design — no "good/bad" framing, matching the app's coaching ethos.
 struct HealthMetricTile: View {
     let title: String
     let value: String
     let unit: String
     let caption: String?
     let color: Color
+    var trend: [Double] = []
+    var tappable: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 0)
+                if tappable {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
+            }
 
             HStack(alignment: .lastTextBaseline, spacing: 2) {
                 Text(value)
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(unit)
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            }
+            .lineLimit(1)
+
+            if trend.count >= 2 {
+                Sparkline(points: trend, color: color)
+                    .frame(height: 26)
             }
 
             if let caption {
@@ -329,6 +440,7 @@ struct HealthMetricTile: View {
         .padding()
         .background(Color.primary.opacity(0.05))
         .cornerRadius(12)
+        .contentShape(Rectangle())
     }
 }
 

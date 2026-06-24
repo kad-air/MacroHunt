@@ -206,17 +206,27 @@ final class HealthKitService {
 
     /// Active energy burned per day (kcal) over the trailing `days`. Days with no data are omitted.
     func dailyActiveEnergy(days: Int) async -> [(date: Date, value: Double)] {
-        await dailyStatistics(identifier: .activeEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
+        await statisticsSeries(identifier: .activeEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
     }
 
     /// Basal (resting) energy burned per day (kcal) over the trailing `days`.
     func dailyBasalEnergy(days: Int) async -> [(date: Date, value: Double)] {
-        await dailyStatistics(identifier: .basalEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
+        await statisticsSeries(identifier: .basalEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum)
     }
 
     /// Step count per day over the trailing `days`.
     func dailySteps(days: Int) async -> [(date: Date, value: Double)] {
-        await dailyStatistics(identifier: .stepCount, unit: .count(), days: days, options: .cumulativeSum)
+        await statisticsSeries(identifier: .stepCount, unit: .count(), days: days, options: .cumulativeSum)
+    }
+
+    /// Bucketed step totals for trend sparklines/charts (`intervalDays`: 1 daily, 7 weekly).
+    func stepsSeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .stepCount, unit: .count(), days: days, options: .cumulativeSum, intervalDays: intervalDays)
+    }
+
+    /// Bucketed active-energy totals (kcal) for trend sparklines/charts.
+    func activeEnergySeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .activeEnergyBurned, unit: .kilocalorie(), days: days, options: .cumulativeSum, intervalDays: intervalDays)
     }
 
     /// Number of recorded workouts over the trailing `days`.
@@ -262,6 +272,25 @@ final class HealthKitService {
         await latestQuantity(identifier: .heartRateRecoveryOneMinute, unit: Self.bpmUnit)
     }
 
+    /// Bucketed trend series for the cardio metrics, used for the tile sparklines and the
+    /// tap-through detail charts (`intervalDays`: 1 daily, 7 weekly). Sparse metrics
+    /// (VO₂ max, recovery) simply yield fewer points.
+    func restingHeartRateSeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .restingHeartRate, unit: Self.bpmUnit, days: days, options: .discreteAverage, intervalDays: intervalDays)
+    }
+
+    func hrvSeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .heartRateVariabilitySDNN, unit: Self.hrvUnit, days: days, options: .discreteAverage, intervalDays: intervalDays)
+    }
+
+    func vo2MaxSeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .vo2Max, unit: Self.vo2Unit, days: days, options: .discreteAverage, intervalDays: intervalDays)
+    }
+
+    func cardioRecoverySeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        await statisticsSeries(identifier: .heartRateRecoveryOneMinute, unit: Self.bpmUnit, days: days, options: .discreteAverage, intervalDays: intervalDays)
+    }
+
     // MARK: - Read: Query primitives
 
     /// Start-of-day `days-1` days ago, so the trailing window includes today — mirroring
@@ -304,14 +333,16 @@ final class HealthKitService {
         }
     }
 
-    /// One value per day over the trailing window, bucketed by `HKStatisticsCollectionQuery`.
-    /// `options` selects the aggregation: `.cumulativeSum` for energy/steps,
-    /// `.discreteAverage` for rates like resting HR. Days with no samples are omitted.
-    private func dailyStatistics(
+    /// One value per bucket over the trailing window, via `HKStatisticsCollectionQuery`.
+    /// `intervalDays` sets the bucket size (1 = daily, 7 = weekly — used to keep long-range
+    /// sparklines/charts readable). `options` selects the aggregation: `.cumulativeSum` for
+    /// energy/steps, `.discreteAverage` for rates like resting HR. Empty buckets are omitted.
+    private func statisticsSeries(
         identifier: HKQuantityTypeIdentifier,
         unit: HKUnit,
         days: Int,
-        options: HKStatisticsOptions
+        options: HKStatisticsOptions,
+        intervalDays: Int = 1
     ) async -> [(date: Date, value: Double)] {
         guard isHealthDataAvailable,
               let type = HKObjectType.quantityType(forIdentifier: identifier),
@@ -326,7 +357,7 @@ final class HealthKitService {
                 quantitySamplePredicate: predicate,
                 options: options,
                 anchorDate: startDate,
-                intervalComponents: DateComponents(day: 1)
+                intervalComponents: DateComponents(day: intervalDays)
             )
             query.initialResultsHandler = { _, results, _ in
                 guard let results else {
@@ -344,6 +375,38 @@ final class HealthKitService {
             }
             store.execute(query)
         }
+    }
+
+    /// Workout counts per bucket over the trailing window. Unlike the quantity series, empty
+    /// buckets are kept as `0` — a week with no workouts is meaningful in the trend.
+    func workoutCountsSeries(days: Int, intervalDays: Int) async -> [(date: Date, value: Double)] {
+        guard isHealthDataAvailable, let startDate = trailingStart(days: days), intervalDays > 0 else { return [] }
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: nil, options: .strictStartDate)
+        let starts: [Date] = await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, results, _ in
+                continuation.resume(returning: (results as? [HKWorkout])?.map(\.startDate) ?? [])
+            }
+            store.execute(query)
+        }
+
+        let calendar = Calendar.current
+        let bucketCount = max(1, Int(ceil(Double(days) / Double(intervalDays))))
+        var buckets = [(date: Date, value: Double)]()
+        for index in 0..<bucketCount {
+            let date = calendar.date(byAdding: .day, value: index * intervalDays, to: startDate) ?? startDate
+            buckets.append((date: date, value: 0))
+        }
+        for start in starts {
+            let dayOffset = calendar.dateComponents([.day], from: startDate, to: start).day ?? 0
+            let bucket = min(max(dayOffset / intervalDays, 0), bucketCount - 1)
+            buckets[bucket].value += 1
+        }
+        return buckets
     }
 }
 
