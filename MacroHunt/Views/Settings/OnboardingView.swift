@@ -33,8 +33,8 @@ struct OnboardingView: View {
                     craftSetupStep
                         .tag(1)
 
-                    // Step 3: Gemini Setup
-                    geminiSetupStep
+                    // Step 3: Claude Setup
+                    claudeSetupStep
                         .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -153,7 +153,7 @@ struct OnboardingView: View {
         }
     }
 
-    private var geminiSetupStep: some View {
+    private var claudeSetupStep: some View {
         ScrollView {
             VStack(spacing: 24) {
                 Image(systemName: "sparkles")
@@ -164,7 +164,7 @@ struct OnboardingView: View {
                 Text("Enable AI Analysis")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
 
-                Text("Add your Gemini API key for nutritional analysis.")
+                Text("Add your Claude API key for nutritional analysis.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -172,14 +172,14 @@ struct OnboardingView: View {
                 GlassCard {
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Gemini API Key")
+                            Text("Anthropic API Key")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            SecureField("Enter your API key", text: $credentials.geminiKey)
+                            SecureField("Enter your API key", text: $credentials.anthropicKey)
                                 .inputFieldStyle()
                         }
 
-                        Text("Get your API key from Google AI Studio")
+                        Text("Get your API key from the Anthropic Console")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
