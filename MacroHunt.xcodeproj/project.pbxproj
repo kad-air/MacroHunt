@@ -432,6 +432,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacroHunt/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "MacroHunt reads weight, activity, and heart data to give you context-aware nutrition insights.";
@@ -465,6 +466,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MacroHunt/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "MacroHunt needs camera access to take photos of your meals for nutritional analysis.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "MacroHunt reads weight, activity, and heart data to give you context-aware nutrition insights.";
