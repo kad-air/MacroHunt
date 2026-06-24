@@ -4,6 +4,12 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var credentials: CredentialsManager
     @FocusState private var calorieFieldFocused: Bool
+    @FocusState private var weightFieldFocused: Bool
+
+    // Weight goal is stored canonically in kg; entered/displayed in the user's preferred
+    // Health unit. `weightText` holds the in-progress entry (empty = no goal).
+    @State private var weightUnit: WeightUnit = Locale.current.measurementSystem == .us ? .pounds : .kilograms
+    @State private var weightText: String = ""
 
     var body: some View {
         NavigationStack {
@@ -66,9 +72,50 @@ struct SettingsView: View {
                                     MacroGoalLabel(name: "Fat", value: credentials.fatGoal, color: .yellow)
                                 }
                                 .padding(.top, 4)
+
+                                Divider()
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Weight Goal")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+
+                                    HStack {
+                                        TextField("Optional", text: $weightText)
+                                            .inputFieldStyle()
+                                            .keyboardType(.decimalPad)
+                                            .focused($weightFieldFocused)
+
+                                        Text(weightUnit.abbreviation)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    if !weightText.isEmpty {
+                                        Picker("Direction", selection: $credentials.weightGoalDirection) {
+                                            ForEach(WeightGoalDirection.allCases) { direction in
+                                                Text(direction.displayName).tag(direction)
+                                            }
+                                        }
+                                        .pickerStyle(.segmented)
+                                        .padding(.top, 4)
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
+                        .task {
+                            weightUnit = await HealthKitService.shared.preferredWeightUnit()
+                            if credentials.weightGoalKg > 0 {
+                                weightText = String(Int(weightUnit.fromKilograms(credentials.weightGoalKg).rounded()))
+                            }
+                        }
+                        .onChange(of: weightText) { _, newValue in
+                            if let value = Double(newValue), value > 0 {
+                                credentials.weightGoalKg = weightUnit.toKilograms(value)
+                            } else {
+                                credentials.weightGoalKg = 0
+                            }
+                        }
 
                         // Apple Health
                         HealthKitSettingsCard()
@@ -113,6 +160,7 @@ struct SettingsView: View {
                     Spacer()
                     Button("Done") {
                         calorieFieldFocused = false
+                        weightFieldFocused = false
                     }
                 }
             }
@@ -167,7 +215,7 @@ private struct HealthKitSettingsCard: View {
                         }
                     }
 
-                    Text("When on, each meal you log is saved to Apple Health as calories, protein, carbs, and fat. You can change permissions any time in the Health app.")
+                    Text("When on, each meal you log is saved to Apple Health, and MacroHunt can read your weight, activity, and heart data to show richer Trends. You can change permissions any time in the Health app.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
 

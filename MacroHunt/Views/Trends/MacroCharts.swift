@@ -160,6 +160,178 @@ struct MacroComparisonChart: View {
     }
 }
 
+// MARK: - Energy Balance Chart (Phase 2)
+
+/// Daily calories in (logged meals) vs. calories out (active + basal energy from Health).
+/// Intake is drawn as bars; expenditure as a line over the top, so a bar shorter than the
+/// line reads as a deficit and taller reads as a surplus.
+struct EnergyBalanceChart: View {
+    let data: [(date: Date, intake: Int, expenditure: Int)]
+
+    private var isWeekView: Bool { data.count <= 7 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Chart {
+                ForEach(data, id: \.date) { item in
+                    BarMark(
+                        x: .value("Date", item.date, unit: .day),
+                        y: .value("Eaten", item.intake)
+                    )
+                    .foregroundStyle(.orange.opacity(0.7))
+                    .cornerRadius(3)
+                }
+
+                ForEach(data, id: \.date) { item in
+                    LineMark(
+                        x: .value("Date", item.date, unit: .day),
+                        y: .value("Burned", item.expenditure)
+                    )
+                    .foregroundStyle(.green)
+                    .interpolationMethod(.catmullRom)
+                    .symbol {
+                        Circle().fill(.green).frame(width: 6, height: 6)
+                    }
+                }
+            }
+            .chartXAxis {
+                if isWeekView {
+                    AxisMarks(values: .stride(by: .day)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                    }
+                } else {
+                    AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
+            }
+            .frame(height: 200)
+
+            HStack(spacing: 16) {
+                LegendDot(color: .orange, label: "Eaten")
+                LegendDot(color: .green, label: "Burned")
+            }
+            .font(.caption2)
+        }
+    }
+}
+
+// MARK: - Weight Trend Chart (Phase 2)
+
+/// Body-weight measurements over time with an optional dashed target line. Values are
+/// already in the user's preferred display unit (`unitLabel`).
+struct WeightTrendChart: View {
+    let data: [(date: Date, value: Double)]
+    let goal: Double?
+    let unitLabel: String
+
+    private var yDomain: ClosedRange<Double> {
+        var values = data.map(\.value)
+        if let goal { values.append(goal) }
+        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        let pad = max((hi - lo) * 0.15, 1)
+        return (lo - pad)...(hi + pad)
+    }
+
+    var body: some View {
+        Chart {
+            if let goal {
+                RuleMark(y: .value("Target", goal))
+                    .foregroundStyle(.blue.opacity(0.6))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+            }
+
+            ForEach(data, id: \.date) { item in
+                LineMark(
+                    x: .value("Date", item.date),
+                    y: .value("Weight", item.value)
+                )
+                .foregroundStyle(.purple)
+                .interpolationMethod(.catmullRom)
+                .symbol {
+                    Circle().fill(.purple).frame(width: 6, height: 6)
+                }
+            }
+        }
+        .chartYScale(domain: yDomain)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let n = value.as(Double.self) {
+                        Text("\(Int(n.rounded())) \(unitLabel)")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Legend Dot
+
+struct LegendDot: View {
+    let color: Color
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Health Metric Tile (Phase 2)
+
+/// Compact stat tile for read-in Health values (activity + cardio). Shows a value with
+/// unit and an optional caption (e.g. the measurement date). Neutral by design — no
+/// "good/bad" framing, matching the app's coaching ethos.
+struct HealthMetricTile: View {
+    let title: String
+    let value: String
+    let unit: String
+    let caption: String?
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(color)
+                Text(unit)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            if let caption {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.8))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.primary.opacity(0.05))
+        .cornerRadius(12)
+    }
+}
+
 // MARK: - Daily Average Stats
 
 struct DailyAverageStats: View {

@@ -175,7 +175,7 @@ struct OnboardingView: View {
                 Text("Apple Health")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
 
-                Text("MacroHunt can write the meals you log — calories, protein, carbs, and fat — to Apple Health, so they show up in the Fitness app and anywhere else you track your health.")
+                Text("MacroHunt can save the meals you log to Apple Health, and read your weight, activity, and heart data back in — so your Trends show what you eat alongside how you move. You choose exactly what to share on the next screen.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)

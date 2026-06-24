@@ -36,6 +36,58 @@ enum MacroSplit: String, CaseIterable, Identifiable {
     }
 }
 
+/// Display unit for body weight. The canonical store is always kilograms (matching
+/// HealthKit's internal unit); this only governs presentation/entry. The active unit is
+/// resolved from the user's Health app preference at display time — see
+/// `HealthKitService.preferredWeightUnit()`.
+enum WeightUnit: String {
+    case kilograms
+    case pounds
+
+    var abbreviation: String {
+        switch self {
+        case .kilograms: return "kg"
+        case .pounds: return "lb"
+        }
+    }
+
+    private static let poundsPerKilogram = 2.2046226218
+
+    /// Converts a value expressed in this unit into canonical kilograms.
+    func toKilograms(_ value: Double) -> Double {
+        switch self {
+        case .kilograms: return value
+        case .pounds: return value / Self.poundsPerKilogram
+        }
+    }
+
+    /// Converts canonical kilograms into a value expressed in this unit.
+    func fromKilograms(_ kilograms: Double) -> Double {
+        switch self {
+        case .kilograms: return kilograms
+        case .pounds: return kilograms * Self.poundsPerKilogram
+        }
+    }
+}
+
+/// Which way the user wants their weight to move. Frames the weight-trend chart and
+/// (Phase 3) coaching tone.
+enum WeightGoalDirection: String, CaseIterable, Identifiable {
+    case lose
+    case maintain
+    case gain
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .lose: return "Lose"
+        case .maintain: return "Maintain"
+        case .gain: return "Gain"
+        }
+    }
+}
+
 class CredentialsManager: ObservableObject {
     static let suiteName = "group.kad-air.MacroHunt"
 
@@ -101,6 +153,26 @@ class CredentialsManager: ObservableObject {
         }
     }
 
+    /// Target body weight in canonical kilograms. `0` means no goal set. Display/entry is
+    /// converted to the user's preferred `WeightUnit` in the UI.
+    @Published var weightGoalKg: Double {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(weightGoalKg, forKey: "weightGoalKg")
+        }
+    }
+
+    /// Direction the user wants their weight to move (lose/maintain/gain).
+    @Published var weightGoalDirection: WeightGoalDirection {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(weightGoalDirection.rawValue, forKey: "weightGoalDirection")
+        }
+    }
+
+    /// Whether a weight target has been set (non-zero).
+    var hasWeightGoal: Bool { weightGoalKg > 0 }
+
     // Computed macro goals based on calorie goal and split
     var proteinGoal: Int {
         let calories = Double(dailyCalorieGoal) * macroSplit.ratios.protein
@@ -138,6 +210,14 @@ class CredentialsManager: ObservableObject {
         }
 
         self.healthKitSyncEnabled = defaults?.bool(forKey: "healthKitSyncEnabled") ?? false
+        self.weightGoalKg = defaults?.double(forKey: "weightGoalKg") ?? 0
+
+        if let directionRaw = defaults?.string(forKey: "weightGoalDirection"),
+           let direction = WeightGoalDirection(rawValue: directionRaw) {
+            self.weightGoalDirection = direction
+        } else {
+            self.weightGoalDirection = .maintain
+        }
 
         // Done initializing - future changes will save
         isInitializing = false
