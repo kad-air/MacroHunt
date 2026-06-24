@@ -80,7 +80,7 @@ struct AddMealView: View {
             // Photo Capture
             GlassCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Meal Photos", icon: "camera.fill")
+                    SectionHeader(title: "Meal Photos (Optional)", icon: "camera.fill")
                     PhotoCaptureView(selectedPhotos: $selectedPhotos)
                 }
             }
@@ -92,6 +92,9 @@ struct AddMealView: View {
                     TextField("What are you eating?", text: $description, axis: .vertical)
                         .lineLimit(2...4)
                         .inputFieldStyle()
+                    Text("Add a photo, a description, or both. A detailed description works even without a photo.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -122,9 +125,14 @@ struct AddMealView: View {
                     Text("Analyze with AI")
                 }
             }
-            .buttonStyle(PrimaryButtonStyle(isEnabled: !selectedPhotos.isEmpty))
-            .disabled(selectedPhotos.isEmpty)
+            .buttonStyle(PrimaryButtonStyle(isEnabled: canAnalyze))
+            .disabled(!canAnalyze)
         }
+    }
+
+    /// Analysis requires at least a photo or a non-empty description.
+    private var canAnalyze: Bool {
+        !selectedPhotos.isEmpty || !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - Review View
@@ -158,7 +166,7 @@ struct AddMealView: View {
             } label: {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Retake Photos")
+                    Text(selectedPhotos.isEmpty ? "Edit Details" : "Retake Photos")
                 }
             }
             .buttonStyle(.bordered)
@@ -207,7 +215,7 @@ struct AddMealView: View {
     // MARK: - Actions
 
     private func analyzePhotos() {
-        guard !selectedPhotos.isEmpty else { return }
+        guard canAnalyze else { return }
         guard credentials.isValid else {
             errorMessage = "Please configure your API credentials in Settings."
             return

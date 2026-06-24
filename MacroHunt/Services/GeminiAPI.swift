@@ -10,10 +10,10 @@ class GeminiAPI {
         self.apiKey = apiKey
     }
 
-    /// Analyzes meal photos and returns nutritional information
+    /// Analyzes a meal from photos, a text description, or both, and returns nutritional information
     /// - Parameters:
-    ///   - images: Array of JPEG image data
-    ///   - description: Optional user description of the meal
+    ///   - images: Array of JPEG image data (may be empty if a description is provided)
+    ///   - description: User description of the meal (may be empty if images are provided)
     ///   - mealType: The type of meal (breakfast, lunch, dinner, snack)
     /// - Returns: NutritionAnalysis with estimated nutritional values
     func analyzeMealPhotos(images: [Data], description: String, mealType: MealType) async throws -> NutritionAnalysis {
@@ -21,10 +21,31 @@ class GeminiAPI {
             throw APIError.invalidURL(Self.baseURL)
         }
 
-        // Build the prompt
+        let hasImages = !images.isEmpty
+        let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Build the prompt, adapting to whether photos, a description, or both were provided
+        let intro: String
+        let guidance: String
+        if hasImages {
+            intro = "Analyze this meal and estimate its nutritional content. Use the photo(s) below"
+                + (trimmedDescription.isEmpty ? "." : " together with the user's description.")
+            guidance = """
+            Be realistic with portions shown in the photos. If multiple items are visible, sum the totals.
+            If you cannot identify the food, make your best estimate based on what you see and the description.
+            """
+        } else {
+            intro = "Estimate the nutritional content of this meal based solely on the user's description below."
+            guidance = """
+            No photo was provided, so estimate from the description alone. Assume typical restaurant or homemade
+            portions when an exact amount isn't given. If multiple items are described, sum the totals.
+            Make your best realistic estimate.
+            """
+        }
+
         let promptText = """
-        Analyze these meal photos and estimate nutritional content.
-        User description: \(description.isEmpty ? "No description provided" : description)
+        \(intro)
+        User description: \(trimmedDescription.isEmpty ? "No description provided" : trimmedDescription)
         Meal type: \(mealType.rawValue)
 
         Return ONLY valid JSON with these exact keys:
@@ -35,8 +56,7 @@ class GeminiAPI {
         - fat: Grams of fat (number, one decimal place)
         - keyNutrients: Notable vitamins/minerals present, comma-separated (string)
 
-        Be realistic with portions shown in photos. If multiple items visible, sum the totals.
-        If you cannot identify the food, make your best estimate based on what you see.
+        \(guidance)
 
         Example response:
         {"mealName": "Grilled Chicken Salad", "calories": 450, "protein": 35.0, "carbs": 20.5, "fat": 25.0, "keyNutrients": "Vitamin A, Vitamin C, Iron, Fiber"}
