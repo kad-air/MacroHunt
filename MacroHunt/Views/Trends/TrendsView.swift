@@ -77,7 +77,10 @@ struct TrendsView: View {
 
     private var filteredMeals: [Meal] {
         let today = calendar.startOfDay(for: Date())
-        let startDate = calendar.date(byAdding: .day, value: -selectedPeriod.days, to: today)!
+        // Window covers today plus the prior (days - 1) days, matching the
+        // calorie trend chart's (0..<days) range. Using -days here would pull
+        // in an extra day, inflating the macro breakdown and daily averages.
+        let startDate = calendar.date(byAdding: .day, value: -(selectedPeriod.days - 1), to: today)!
 
         return allMeals.filter { meal in
             meal.date >= startDate
