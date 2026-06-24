@@ -4,7 +4,7 @@ import Foundation
 class GeminiAPI {
     let apiKey: String
 
-    private static let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+    private static let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     init(apiKey: String) {
         self.apiKey = apiKey
