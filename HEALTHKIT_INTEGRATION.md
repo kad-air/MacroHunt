@@ -39,6 +39,12 @@ flows to the Fitness app and any other Health-aware app. Write-only; opt-in.
   indicator, "Enable Apple Health" button that fires authorization immediately, shows a
   green confirmation on grant, skippable via "Next"/"Get Started"). Health is optional so
   "Get Started" remains gated only on `credentials.isValid`.
+- **Historical sync on first enablement** — `MealRepository.syncHistoricalMeals` finds
+  all meals with no `healthKitFoodUUID` and writes them to Health in order, saving each
+  UUID back to SwiftData as it goes (best-effort, individual failures skipped). Both the
+  Settings card and onboarding step trigger this automatically after authorization, showing
+  an inline progress bar and a "X past meals synced" confirmation when done. Subsequent
+  toggle-offs/ons only pick up meals logged while sync was off.
 - `MacroHunt/MacroHunt.entitlements` — new file: `com.apple.developer.healthkit` plus
   the existing `group.kad-air.MacroHunt` app group (now declared explicitly).
 - `project.pbxproj` — registered the new service file, wired `CODE_SIGN_ENTITLEMENTS`,
