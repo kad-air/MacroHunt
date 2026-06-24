@@ -46,13 +46,13 @@ struct APIConfigurationView: View {
 
                     GlassCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(title: "Gemini API", icon: "sparkles")
+                            SectionHeader(title: "Claude API", icon: "sparkles")
 
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("API Key")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                SecureField("Enter your Gemini API key", text: $credentials.geminiKey)
+                                SecureField("Enter your Anthropic API key", text: $credentials.anthropicKey)
                                     .inputFieldStyle()
                             }
                         }

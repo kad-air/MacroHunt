@@ -23,7 +23,7 @@
 		001000001000000000000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000014 /* SettingsView.swift */; };
 		001000001000000000000015 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000015 /* OnboardingView.swift */; };
 		001000001000000000000016 /* CraftAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000016 /* CraftAPI.swift */; };
-		001000001000000000000017 /* GeminiAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000017 /* GeminiAPI.swift */; };
+		001000001000000000000017 /* ClaudeAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000017 /* ClaudeAPI.swift */; };
 		001000001000000000000018 /* MealRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000018 /* MealRepository.swift */; };
 		001000001000000000000019 /* CredentialsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000019 /* CredentialsManager.swift */; };
 		001000001000000000000020 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000020 /* KeychainHelper.swift */; };
@@ -52,7 +52,7 @@
 		001000002000000000000014 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		001000002000000000000015 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		001000002000000000000016 /* CraftAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftAPI.swift; sourceTree = "<group>"; };
-		001000002000000000000017 /* GeminiAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAPI.swift; sourceTree = "<group>"; };
+		001000002000000000000017 /* ClaudeAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeAPI.swift; sourceTree = "<group>"; };
 		001000002000000000000018 /* MealRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRepository.swift; sourceTree = "<group>"; };
 		001000002000000000000019 /* CredentialsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsManager.swift; sourceTree = "<group>"; };
 		001000002000000000000020 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
@@ -120,7 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				001000002000000000000016 /* CraftAPI.swift */,
-				001000002000000000000017 /* GeminiAPI.swift */,
+				001000002000000000000017 /* ClaudeAPI.swift */,
 				001000002000000000000018 /* MealRepository.swift */,
 			);
 			path = Services;
@@ -279,7 +279,7 @@
 				001000001000000000000014 /* SettingsView.swift in Sources */,
 				001000001000000000000015 /* OnboardingView.swift in Sources */,
 				001000001000000000000016 /* CraftAPI.swift in Sources */,
-				001000001000000000000017 /* GeminiAPI.swift in Sources */,
+				001000001000000000000017 /* ClaudeAPI.swift in Sources */,
 				001000001000000000000018 /* MealRepository.swift in Sources */,
 				001000001000000000000019 /* CredentialsManager.swift in Sources */,
 				001000001000000000000020 /* KeychainHelper.swift in Sources */,

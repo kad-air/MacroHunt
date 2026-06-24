@@ -230,8 +230,8 @@ struct AddMealView: View {
                     image.jpegData(compressionQuality: 0.7)
                 }
 
-                let gemini = GeminiAPI(apiKey: credentials.geminiKey)
-                let result = try await gemini.analyzeMealPhotos(
+                let claude = ClaudeAPI(apiKey: credentials.anthropicKey)
+                let result = try await claude.analyzeMealPhotos(
                     images: imageData,
                     description: description,
                     mealType: mealType

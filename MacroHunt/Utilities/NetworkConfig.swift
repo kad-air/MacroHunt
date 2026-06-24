@@ -11,7 +11,7 @@ enum NetworkConfig {
         return URLSession(configuration: config)
     }()
 
-    /// Maximum image size to send to Gemini (2MB per image)
+    /// Maximum image size to send to Claude (2MB per image)
     static let maxImageSize = 2 * 1024 * 1024
 
     /// Retry configuration

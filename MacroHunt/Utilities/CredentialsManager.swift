@@ -63,10 +63,10 @@ class CredentialsManager: ObservableObject {
         }
     }
 
-    @Published var geminiKey: String {
+    @Published var anthropicKey: String {
         didSet {
             guard !isInitializing else { return }
-            let success = keychain.save(geminiKey, service: service, account: "geminiKey")
+            let success = keychain.save(anthropicKey, service: service, account: "anthropicKey")
             lastKeychainError = !success
         }
     }
@@ -116,7 +116,7 @@ class CredentialsManager: ObservableObject {
         // Load from storage (didSet guards prevent re-saving during init)
         self.craftToken = keychain.read(service: service, account: "craftToken") ?? ""
         self.spaceId = defaults?.string(forKey: "spaceId") ?? ""
-        self.geminiKey = keychain.read(service: service, account: "geminiKey") ?? ""
+        self.anthropicKey = keychain.read(service: service, account: "anthropicKey") ?? ""
         self.collectionId = defaults?.string(forKey: "collectionId") ?? ""
         self.dailyCalorieGoal = defaults?.integer(forKey: "dailyCalorieGoal") ?? 2000
 
@@ -133,7 +133,7 @@ class CredentialsManager: ObservableObject {
     }
 
     var isValid: Bool {
-        !craftToken.isEmpty && !spaceId.isEmpty && !geminiKey.isEmpty && !collectionId.isEmpty
+        !craftToken.isEmpty && !spaceId.isEmpty && !anthropicKey.isEmpty && !collectionId.isEmpty
     }
 
     var configurationError: String? {
@@ -148,8 +148,8 @@ class CredentialsManager: ObservableObject {
 
     func clearKeychainCredentials() {
         keychain.delete(service: service, account: "craftToken")
-        keychain.delete(service: service, account: "geminiKey")
+        keychain.delete(service: service, account: "anthropicKey")
         craftToken = ""
-        geminiKey = ""
+        anthropicKey = ""
     }
 }
