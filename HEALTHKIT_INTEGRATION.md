@@ -35,6 +35,10 @@ flows to the Fitness app and any other Health-aware app. Write-only; opt-in.
   Craft configured.
 - `Views/Settings/SettingsView.swift` — "Apple Health" card with an opt-in toggle that
   requests authorization on enable and reverts if it fails / Health is unavailable.
+- `Views/Settings/OnboardingView.swift` — added Step 4 "Apple Health" (4-pip progress
+  indicator, "Enable Apple Health" button that fires authorization immediately, shows a
+  green confirmation on grant, skippable via "Next"/"Get Started"). Health is optional so
+  "Get Started" remains gated only on `credentials.isValid`.
 - `MacroHunt/MacroHunt.entitlements` — new file: `com.apple.developer.healthkit` plus
   the existing `group.kad-air.MacroHunt` app group (now declared explicitly).
 - `project.pbxproj` — registered the new service file, wired `CODE_SIGN_ENTITLEMENTS`,

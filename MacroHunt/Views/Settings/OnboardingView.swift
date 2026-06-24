@@ -1,11 +1,14 @@
 // Views/Settings/OnboardingView.swift
 import SwiftUI
+import HealthKit
 
 struct OnboardingView: View {
     @EnvironmentObject var credentials: CredentialsManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var currentStep = 0
+    @State private var healthKitStatus: HKAuthorizationStatus = .notDetermined
+    @State private var healthKitRequesting = false
 
     var body: some View {
         ZStack {
@@ -15,7 +18,7 @@ struct OnboardingView: View {
             VStack(spacing: 24) {
                 // Progress indicator
                 HStack(spacing: 8) {
-                    ForEach(0..<3) { step in
+                    ForEach(0..<4) { step in
                         Capsule()
                             .fill(step <= currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
                             .frame(height: 4)
@@ -36,6 +39,10 @@ struct OnboardingView: View {
                     // Step 3: Claude Setup
                     claudeSetupStep
                         .tag(2)
+
+                    // Step 4: Apple Health
+                    healthKitStep
+                        .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -52,11 +59,9 @@ struct OnboardingView: View {
 
                     Spacer()
 
-                    if currentStep < 2 {
+                    if currentStep < 3 {
                         Button("Next") {
-                            withAnimation {
-                                currentStep += 1
-                            }
+                            withAnimation { currentStep += 1 }
                         }
                         .buttonStyle(.borderedProminent)
                     } else {
@@ -150,6 +155,89 @@ struct OnboardingView: View {
                 .padding(.horizontal)
             }
             .padding()
+        }
+    }
+
+    private var healthKitStep: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.red, .red.opacity(0.3))
+                    .padding(.top, 40)
+
+                Text("Apple Health")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+
+                Text("MacroHunt can write the meals you log — calories, protein, carbs, and fat — to Apple Health, so they show up in the Fitness app and anywhere else you track your health.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                if HealthKitService.shared.isHealthDataAvailable {
+                    switch healthKitStatus {
+                    case .sharingAuthorized:
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Apple Health connected")
+                                .font(.subheadline)
+                                .foregroundColor(.green)
+                        }
+                        .padding()
+
+                    default:
+                        Button {
+                            requestHealthKitAuthorization()
+                        } label: {
+                            HStack {
+                                if healthKitRequesting {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "heart.fill")
+                                }
+                                Text("Enable Apple Health")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .disabled(healthKitRequesting)
+                        .padding(.horizontal)
+                    }
+                } else {
+                    Text("Apple Health isn't available on this device.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Text("You can change this any time in Settings.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+        }
+    }
+
+    private func requestHealthKitAuthorization() {
+        healthKitRequesting = true
+        Task {
+            do {
+                try await HealthKitService.shared.requestAuthorization()
+                await MainActor.run {
+                    healthKitRequesting = false
+                    healthKitStatus = HealthKitService.shared.energyAuthorizationStatus()
+                    credentials.healthKitSyncEnabled = (healthKitStatus == .sharingAuthorized)
+                }
+            } catch {
+                await MainActor.run {
+                    healthKitRequesting = false
+                    // Leave toggle off; user can enable in Settings later
+                }
+            }
         }
     }
 
