@@ -192,7 +192,8 @@ final class HealthKitService {
 
     /// Most recent body-mass measurement, in kilograms.
     func latestBodyMass() async -> (date: Date, kilograms: Double)? {
-        await latestQuantity(identifier: .bodyMass, unit: Self.kilogramUnit)
+        guard let result = await latestQuantity(identifier: .bodyMass, unit: Self.kilogramUnit) else { return nil }
+        return (date: result.date, kilograms: result.value)
     }
 
     /// All body-mass measurements over the trailing `days`, oldest first, in kilograms.
