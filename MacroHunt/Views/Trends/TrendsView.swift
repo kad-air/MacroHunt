@@ -346,18 +346,27 @@ struct TrendsView: View {
         }
     }
 
-    private var dailyCalorieData: [(date: Date, calories: Int)] {
+    /// Per-day calories across the selected window. A day with no logged meals is `nil`
+    /// (untracked) rather than `0`, so the chart and energy balance don't read an untracked
+    /// day as a zero-calorie / huge-deficit day.
+    private var dailyCalorieData: [(date: Date, calories: Int?)] {
         let today = calendar.startOfDay(for: Date())
-        var result: [(Date, Int)] = []
+        var result: [(Date, Int?)] = []
 
         for dayOffset in (0..<selectedPeriod.days).reversed() {
             let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
             let dayMeals = filteredMeals.filter { calendar.isDate($0.date, inSameDayAs: date) }
-            let totalCalories = dayMeals.reduce(0) { $0 + $1.calories }
-            result.append((date, totalCalories))
+            result.append((date, dayMeals.isEmpty ? nil : dayMeals.reduce(0) { $0 + $1.calories }))
         }
 
         return result
+    }
+
+    /// Only the days that were actually tracked — what the calorie line should plot. Plotting
+    /// untracked days as zeros would draw a misleading crash to the axis on days the user
+    /// simply didn't log.
+    private var trackedCalorieData: [(date: Date, calories: Int)] {
+        dailyCalorieData.compactMap { day in day.calories.map { (day.date, $0) } }
     }
 
     private var totalMacros: (protein: Double, carbs: Double, fat: Double) {
@@ -391,7 +400,7 @@ struct TrendsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Calorie Trend", icon: "chart.line.uptrend.xyaxis")
 
-                CalorieTrendChart(data: dailyCalorieData, goal: credentials.dailyCalorieGoal)
+                CalorieTrendChart(data: trackedCalorieData, goal: credentials.dailyCalorieGoal)
                     .frame(height: 200)
             }
         }
@@ -422,12 +431,17 @@ struct TrendsView: View {
         }
     }
 
+    private var trackedDayCount: Int {
+        Set(filteredMeals.map { calendar.startOfDay(for: $0.date) }).count
+    }
+
     private var averagesSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Daily Averages", icon: "function")
 
                 let avg = averages
+                let days = trackedDayCount
 
                 DailyAverageStats(
                     avgCalories: avg.calories,
@@ -435,6 +449,12 @@ struct TrendsView: View {
                     avgCarbs: avg.carbs,
                     avgFat: avg.fat
                 )
+
+                // Be honest about how little history this average is built on — over only the
+                // days actually logged, not the whole period.
+                Text("Averaged over \(days) logged day\(days == 1 ? "" : "s") in the last \(selectedPeriod.days)")
+                    .font(.caption)
+                    .foregroundStyle(Theme.ink3)
             }
         }
     }
@@ -443,9 +463,12 @@ struct TrendsView: View {
 
     private var energyBalanceData: [(date: Date, intake: Int, expenditure: Int)] {
         dailyCalorieData.compactMap { day in
+            // Skip untracked days: pairing a nil/zero intake against real expenditure would
+            // invent a full-day deficit on a day the user just didn't log.
+            guard let intake = day.calories else { return nil }
             let key = calendar.startOfDay(for: day.date)
             guard let expenditure = health.dailyExpenditure[key] else { return nil }
-            return (date: day.date, intake: day.calories, expenditure: expenditure)
+            return (date: day.date, intake: intake, expenditure: expenditure)
         }
     }
 

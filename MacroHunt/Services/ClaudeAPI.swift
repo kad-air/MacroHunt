@@ -193,11 +193,13 @@ class ClaudeAPI {
             "type": "object",
             "properties": [
                 "headline": ["type": "string"],
+                // Note: array count bounds (minItems/maxItems) are NOT part of the
+                // structured-outputs JSON Schema subset — including them makes the API
+                // reject the whole request with a 400. The 2–4 range is conveyed via the
+                // system prompt instead.
                 "observations": [
                     "type": "array",
-                    "items": ["type": "string"],
-                    "minItems": 1,
-                    "maxItems": 4
+                    "items": ["type": "string"]
                 ],
                 "suggestion": ["type": "string"],
                 "encouragement": ["type": "string"]

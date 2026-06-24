@@ -409,13 +409,18 @@ final class ReflectionViewModel: ObservableObject {
             lines.append("- Eaten so far: \(today.calories) kcal · P \(Int(today.protein)) g · C \(Int(today.carbs)) g · F \(Int(today.fat)) g")
         }
         if let week = try? repo.weeklyAverages() {
-            lines.append("\nLAST 7 DAYS (averages)")
-            lines.append("- Calories: \(Int(week.avgCalories)) kcal/day")
-            lines.append("- Protein: \(Int(week.avgProtein)) g · Carbs: \(Int(week.avgCarbs)) g · Fat: \(Int(week.avgFat)) g")
+            lines.append("\nLAST 7 DAYS")
+            if week.trackedDays > 0 {
+                lines.append("- Logged \(week.trackedDays) of the last 7 days")
+                lines.append("- Averages over the days they logged: \(Int(week.avgCalories)) kcal/day · P \(Int(week.avgProtein)) g · C \(Int(week.avgCarbs)) g · F \(Int(week.avgFat)) g")
+            } else {
+                lines.append("- No meals logged in the last 7 days")
+            }
         }
         if let daily = try? repo.dailyCaloriesForRange(days: 7) {
-            let series = daily.map { "\($0.calories)" }.joined(separator: ", ")
+            let series = daily.map { $0.calories.map(String.init) ?? "untracked" }.joined(separator: ", ")
             lines.append("- Daily calories (oldest→newest): \(series)")
+            lines.append("- Note: \"untracked\" means no meal was logged that day — the user simply didn't track it, not that they fasted or ate at a deficit. Don't read untracked days as low-calorie days, and don't scold missed logging.")
         }
 
         // Health (best-effort)

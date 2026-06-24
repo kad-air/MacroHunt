@@ -132,14 +132,19 @@ class MealRepository: ObservableObject {
         }
     }
 
-    func weeklyAverages() throws -> (avgCalories: Double, avgProtein: Double, avgCarbs: Double, avgFat: Double) {
+    /// Averages intake over the days the user *actually logged*, not a fixed 7. A day with no
+    /// meals means it wasn't tracked — not that zero calories were eaten — so folding those
+    /// days into the divisor would understate real intake. `trackedDays` lets callers be
+    /// honest about how much history the average is built on.
+    func weeklyAverages() throws -> (avgCalories: Double, avgProtein: Double, avgCarbs: Double, avgFat: Double, trackedDays: Int) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let weekAgo = calendar.date(byAdding: .day, value: -7, to: today)!
 
         let meals = try fetchMealsInRange(from: weekAgo, to: today)
 
-        guard !meals.isEmpty else { return (0, 0, 0, 0) }
+        let trackedDays = Set(meals.map { calendar.startOfDay(for: $0.date) }).count
+        guard trackedDays > 0 else { return (0, 0, 0, 0, 0) }
 
         let totals = meals.reduce((0, 0.0, 0.0, 0.0)) { result, meal in
             (
@@ -150,12 +155,13 @@ class MealRepository: ObservableObject {
             )
         }
 
-        let days = 7.0
+        let days = Double(trackedDays)
         return (
             Double(totals.0) / days,
             totals.1 / days,
             totals.2 / days,
-            totals.3 / days
+            totals.3 / days,
+            trackedDays
         )
     }
 

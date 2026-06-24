@@ -223,8 +223,10 @@ struct CalendarView: View {
         return meals.isEmpty ? nil : meals
     }
 
-    private func caloriesForDate(_ date: Date) -> Int {
-        mealsForDate(date)?.reduce(0) { $0 + $1.calories } ?? 0
+    /// Calories for a day, or `nil` when nothing was logged. `nil` (untracked) is rendered
+    /// differently from a tracked-but-light day — an untracked day isn't a low-calorie day.
+    private func caloriesForDate(_ date: Date) -> Int? {
+        mealsForDate(date).map { $0.reduce(0) { $0 + $1.calories } }
     }
 
     private func monthYearString(from date: Date) -> String {
@@ -244,7 +246,7 @@ struct CalendarView: View {
 
 private struct DayCell: View {
     let date: Date
-    let calories: Int
+    let calories: Int?
     let goal: Int
     let isSelected: Bool
     let isToday: Bool
@@ -260,7 +262,7 @@ private struct DayCell: View {
                     .font(.system(size: 14, weight: isToday ? .bold : .semibold, design: .rounded))
                     .foregroundStyle(isFuture ? Theme.ink3 : Theme.ink)
                 Circle()
-                    .fill(isFuture ? Color.clear : dotColor)
+                    .fill(showDot ? dotColor : Color.clear)
                     .frame(width: 6, height: 6)
             }
             .frame(maxWidth: .infinity)
@@ -278,8 +280,15 @@ private struct DayCell: View {
         .disabled(isFuture)
     }
 
+    /// Only tracked past days get a dot. A future day or an untracked past day (`calories ==
+    /// nil`) shows nothing, so a sparse history reads as "not logged" rather than a row of
+    /// identical low-intake days.
+    private var showDot: Bool {
+        !isFuture && calories != nil
+    }
+
     private var dotColor: Color {
-        guard calories > 0, goal > 0 else { return Theme.ink3 }
+        guard let calories, calories > 0, goal > 0 else { return Theme.ink3 }
         let ratio = Double(calories) / Double(goal)
         if ratio < 0.5 { return Theme.ink3 }
         if ratio < 0.8 { return Theme.carbs }
