@@ -183,16 +183,19 @@ class MealRepository: ObservableObject {
         return (synced, total)
     }
 
-    func dailyCaloriesForRange(days: Int) throws -> [(date: Date, calories: Int)] {
+    /// Daily calorie totals over the trailing `days`. A day with no logged meals is `nil`
+    /// (untracked), not `0` — callers must not read a missing day as a zero-calorie day.
+    func dailyCaloriesForRange(days: Int) throws -> [(date: Date, calories: Int?)] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        var results: [(Date, Int)] = []
+        var results: [(Date, Int?)] = []
 
         for dayOffset in (0..<days).reversed() {
             let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
-            let totals = try dailyTotals(for: date)
-            results.append((date, totals.calories))
+            let meals = try fetchMealsForDate(date)
+            let calories = meals.isEmpty ? nil : meals.reduce(0) { $0 + $1.calories }
+            results.append((date, calories))
         }
 
         return results
