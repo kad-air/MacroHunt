@@ -43,9 +43,12 @@ final class HealthKitService {
                 types.insert(type)
             }
         }
-        if let food = foodCorrelationType {
-            types.insert(food)
-        }
+        // Do NOT add the `.food` correlation type here. HealthKit disallows
+        // correlation types in a share-authorization request and raises an
+        // NSInvalidArgumentException (`_throwIfAuthorizationDisallowedForSharing`)
+        // that Swift can't catch — a hard SIGABRT crash. Saving an HKCorrelation
+        // only requires authorization for its member sample types (the quantity
+        // types above), so requesting those is sufficient to write `.food`.
         return types
     }
 
