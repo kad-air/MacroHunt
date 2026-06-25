@@ -7,6 +7,7 @@ enum MacroSplit: String, CaseIterable, Identifiable {
     case balanced = "balanced"
     case lowCarb = "lowCarb"
     case highProtein = "highProtein"
+    case custom = "custom"
 
     var id: String { rawValue }
 
@@ -15,23 +16,30 @@ enum MacroSplit: String, CaseIterable, Identifiable {
         case .balanced: return "Balanced"
         case .lowCarb: return "Low Carb"
         case .highProtein: return "High Protein"
+        case .custom: return "Custom"
         }
     }
 
     var description: String {
         switch self {
-        case .balanced: return "30% protein, 40% carbs, 30% fat"
-        case .lowCarb: return "40% protein, 20% carbs, 40% fat"
+        case .balanced: return "20% protein, 50% carbs, 30% fat"
+        case .lowCarb: return "25% protein, 20% carbs, 55% fat"
         case .highProtein: return "35% protein, 40% carbs, 25% fat"
+        case .custom: return "Your own protein, carbs & fat targets"
         }
     }
 
-    // Returns (protein%, carbs%, fat%) as decimals
-    var ratios: (protein: Double, carbs: Double, fat: Double) {
+    /// Fixed macro ratios (protein, carbs, fat) as decimals of total calories. `nil` for
+    /// `.custom`, whose ratios come from the user-set percentages on `CredentialsManager`.
+    /// Balanced and High Protein sit inside the Institute of Medicine's Acceptable
+    /// Macronutrient Distribution Ranges (protein 10–35%, carbs 45–65%, fat 20–35%); Low
+    /// Carb is intentionally carb-restricted below that range with fat raised to compensate.
+    var presetRatios: (protein: Double, carbs: Double, fat: Double)? {
         switch self {
-        case .balanced: return (0.30, 0.40, 0.30)
-        case .lowCarb: return (0.40, 0.20, 0.40)
+        case .balanced:    return (0.20, 0.50, 0.30)
         case .highProtein: return (0.35, 0.40, 0.25)
+        case .lowCarb:     return (0.25, 0.20, 0.55)
+        case .custom:      return nil
         }
     }
 }
@@ -144,6 +152,29 @@ class CredentialsManager: ObservableObject {
         }
     }
 
+    /// User-defined macro percentages (whole-number percent of daily calories) used only
+    /// when `macroSplit == .custom`. Resolved and normalized via `macroRatios`.
+    @Published var customProteinPct: Int {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(customProteinPct, forKey: "customProteinPct")
+        }
+    }
+
+    @Published var customCarbsPct: Int {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(customCarbsPct, forKey: "customCarbsPct")
+        }
+    }
+
+    @Published var customFatPct: Int {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(customFatPct, forKey: "customFatPct")
+        }
+    }
+
     /// Opt-in: mirror logged meals into Apple Health. Independent of `isValid` (Craft/AI
     /// config); HealthKit sync works even without Craft configured. Defaults off.
     @Published var healthKitSyncEnabled: Bool {
@@ -193,19 +224,33 @@ class CredentialsManager: ObservableObject {
     /// Whether a weight target has been set (non-zero).
     var hasWeightGoal: Bool { weightGoalKg > 0 }
 
+    /// Active macro ratios (protein, carbs, fat) as decimals of the calorie goal: the
+    /// preset's fixed split, or the user's custom percentages when `macroSplit == .custom`.
+    /// Custom percentages are normalized to sum to 1 so the three macro goals always add up
+    /// to the calorie goal even if the entered numbers don't total exactly 100%.
+    var macroRatios: (protein: Double, carbs: Double, fat: Double) {
+        if let preset = macroSplit.presetRatios { return preset }
+        let p = Double(max(customProteinPct, 0))
+        let c = Double(max(customCarbsPct, 0))
+        let f = Double(max(customFatPct, 0))
+        let total = p + c + f
+        guard total > 0 else { return (0.20, 0.50, 0.30) } // all-zero falls back to balanced
+        return (p / total, c / total, f / total)
+    }
+
     // Computed macro goals based on calorie goal and split
     var proteinGoal: Int {
-        let calories = Double(dailyCalorieGoal) * macroSplit.ratios.protein
+        let calories = Double(dailyCalorieGoal) * macroRatios.protein
         return Int(calories / 4.0) // 4 cal per gram of protein
     }
 
     var carbsGoal: Int {
-        let calories = Double(dailyCalorieGoal) * macroSplit.ratios.carbs
+        let calories = Double(dailyCalorieGoal) * macroRatios.carbs
         return Int(calories / 4.0) // 4 cal per gram of carbs
     }
 
     var fatGoal: Int {
-        let calories = Double(dailyCalorieGoal) * macroSplit.ratios.fat
+        let calories = Double(dailyCalorieGoal) * macroRatios.fat
         return Int(calories / 9.0) // 9 cal per gram of fat
     }
 
@@ -228,6 +273,12 @@ class CredentialsManager: ObservableObject {
         } else {
             self.macroSplit = .balanced
         }
+
+        // Custom macro percentages (only consulted when macroSplit == .custom). Default to a
+        // 30/40/30 starting point; object(forKey:) distinguishes "unset" from a stored 0.
+        self.customProteinPct = defaults?.object(forKey: "customProteinPct") as? Int ?? 30
+        self.customCarbsPct = defaults?.object(forKey: "customCarbsPct") as? Int ?? 40
+        self.customFatPct = defaults?.object(forKey: "customFatPct") as? Int ?? 30
 
         self.healthKitSyncEnabled = defaults?.bool(forKey: "healthKitSyncEnabled") ?? false
         self.weightGoalKg = defaults?.double(forKey: "weightGoalKg") ?? 0

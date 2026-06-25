@@ -105,16 +105,28 @@ struct SettingsView: View {
                             Text("kcal/day").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
                         }
 
-                        Picker("Macro Split", selection: $credentials.macroSplit) {
-                            ForEach(MacroSplit.allCases) { split in
-                                Text(split.displayName).tag(split)
+                        HStack {
+                            Text("Macro split")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.ink2)
+                            Spacer()
+                            Picker("Macro Split", selection: $credentials.macroSplit) {
+                                ForEach(MacroSplit.allCases) { split in
+                                    Text(split.displayName).tag(split)
+                                }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .tint(Theme.accent)
                         }
-                        .pickerStyle(.segmented)
 
-                        Text(credentials.macroSplit.description)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.ink3)
+                        if credentials.macroSplit == .custom {
+                            customMacroEditor
+                        } else {
+                            Text(credentials.macroSplit.description)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.ink3)
+                        }
                     }
                     .padding(.top, 16)
                 } else {
@@ -148,6 +160,53 @@ struct SettingsView: View {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink2)
             Text("\(grams)g").font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink)
+        }
+    }
+
+    // MARK: - Custom macro editor
+
+    /// Three percentage steppers for the `.custom` split. The protein/carbs/fat gram targets
+    /// are not duplicated here — the `macroGoalRow` below the calorie field already shows
+    /// them and updates live as these steppers change (goals are derived from the percentages).
+    @ViewBuilder
+    private var customMacroEditor: some View {
+        let total = credentials.customProteinPct + credentials.customCarbsPct + credentials.customFatPct
+        VStack(alignment: .leading, spacing: 12) {
+            customMacroStepper("Protein", value: $credentials.customProteinPct, color: Theme.protein)
+            customMacroStepper("Carbs", value: $credentials.customCarbsPct, color: Theme.carbs)
+            customMacroStepper("Fat", value: $credentials.customFatPct, color: Theme.fat)
+
+            HStack {
+                Text("Total").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink2)
+                Spacer()
+                Text("\(total)%")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(total == 100 ? Theme.good : .orange)
+                    .monospacedDigit()
+            }
+
+            Text(total == 100
+                 ? "Grams below update as you adjust."
+                 : "Tip: aim for 100%. Targets are scaled to your calorie goal.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.ink3)
+        }
+        .tint(Theme.accent)
+    }
+
+    private func customMacroStepper(_ name: String, value: Binding<Int>, color: Color) -> some View {
+        HStack(spacing: 10) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
+            Spacer()
+            Text("\(value.wrappedValue)%")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.ink)
+                .monospacedDigit()
+                .frame(minWidth: 42, alignment: .trailing)
+            Stepper("", value: value, in: 0...100, step: 5)
+                .labelsHidden()
+                .fixedSize()
         }
     }
 
