@@ -2,6 +2,23 @@
 import SwiftUI
 import Charts
 
+// MARK: - Smoothing
+
+/// Centered simple moving average over an ordered series — smooths day-to-day (or
+/// bucket-to-bucket) spikes into a trend line. Centered rather than trailing so the smoothed
+/// line sits *over* the raw data instead of lagging behind it; the window shrinks at the ends
+/// where it can't be fully filled.
+func centeredMovingAverage(_ values: [Double], window: Int) -> [Double] {
+    guard window > 1, values.count >= 2 else { return values }
+    let half = window / 2
+    return values.indices.map { index in
+        let lower = max(0, index - half)
+        let upper = min(values.count - 1, index + half)
+        let slice = values[lower...upper]
+        return slice.reduce(0, +) / Double(slice.count)
+    }
+}
+
 // MARK: - Calorie Trend Chart
 
 struct CalorieTrendChart: View {
@@ -12,57 +29,108 @@ struct CalorieTrendChart: View {
         data.count <= 7
     }
 
+    /// Show the smoothing line only once there's enough history for it to mean something —
+    /// below this a "trend" over 2–3 points is just the raw line with a lag.
+    private var showMovingAverage: Bool {
+        data.count >= 4
+    }
+
+    /// Centered moving-average window. Tighter for the 7-day view (a 3-day window still reads
+    /// as daily), wider for the month so the week-to-week trend comes through.
+    private var movingAverageWindow: Int {
+        isWeekView ? 3 : 7
+    }
+
+    /// Centered simple moving average of the daily calories — smooths the day-to-day spikes
+    /// into a trend line. Centered (not trailing) so the smoothed line sits over the raw data
+    /// instead of lagging behind it; the window shrinks at the ends where it can't be filled.
+    private var movingAverageData: [(date: Date, value: Double)] {
+        guard showMovingAverage else { return [] }
+        let averaged = centeredMovingAverage(data.map { Double($0.calories) }, window: movingAverageWindow)
+        return zip(data, averaged).map { (date: $0.date, value: $1) }
+    }
+
     var body: some View {
-        Chart {
-            // Goal line
-            RuleMark(y: .value("Goal", goal))
-                .foregroundStyle(Theme.accent.opacity(0.5))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+        VStack(alignment: .leading, spacing: 8) {
+            Chart {
+                // Goal line
+                RuleMark(y: .value("Goal", goal))
+                    .foregroundStyle(Theme.accent.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
 
-            // Data points
-            ForEach(data, id: \.date) { item in
-                LineMark(
-                    x: .value("Date", item.date, unit: .day),
-                    y: .value("Calories", item.calories)
-                )
-                .foregroundStyle(Theme.accent)
-                .symbol {
-                    Circle()
-                        .fill(Theme.accent)
-                        .frame(width: 8, height: 8)
-                }
-
-                AreaMark(
-                    x: .value("Date", item.date, unit: .day),
-                    y: .value("Calories", item.calories)
-                )
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [Theme.accent.opacity(0.3), Theme.accent.opacity(0.05)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                // Raw daily line. Recedes to a thin, faded line with dots when the moving
+                // average is shown, so the smoothed trend reads as the headline.
+                ForEach(data, id: \.date) { item in
+                    LineMark(
+                        x: .value("Date", item.date, unit: .day),
+                        y: .value("Calories", item.calories),
+                        series: .value("Series", "Daily")
                     )
-                )
-            }
-        }
-        .chartYScale(domain: 0...(max(goal, (data.map(\.calories).max() ?? 0)) + 500))
-        .chartXAxis {
-            if isWeekView {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                    .foregroundStyle(Theme.accent.opacity(showMovingAverage ? 0.35 : 1))
+                    .lineStyle(StrokeStyle(lineWidth: showMovingAverage ? 1.5 : 2))
+                    .symbol {
+                        Circle()
+                            .fill(Theme.accent.opacity(showMovingAverage ? 0.5 : 1))
+                            .frame(width: showMovingAverage ? 5 : 8, height: showMovingAverage ? 5 : 8)
+                    }
+
+                    AreaMark(
+                        x: .value("Date", item.date, unit: .day),
+                        y: .value("Calories", item.calories)
+                    )
+                    .foregroundStyle(
+                        .linearGradient(
+                            colors: [Theme.accent.opacity(showMovingAverage ? 0.15 : 0.3),
+                                     Theme.accent.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                 }
-            } else {
-                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+
+                // Smoothed moving-average trend line.
+                if showMovingAverage {
+                    ForEach(movingAverageData, id: \.date) { item in
+                        LineMark(
+                            x: .value("Date", item.date, unit: .day),
+                            y: .value("Trend", item.value),
+                            series: .value("Series", "Trend")
+                        )
+                        .foregroundStyle(Theme.accent)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .interpolationMethod(.catmullRom)
+                    }
                 }
             }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { _ in
-                AxisGridLine()
-                AxisValueLabel()
+            .chartYScale(domain: 0...(max(goal, (data.map(\.calories).max() ?? 0)) + 500))
+            .chartXAxis {
+                if isWeekView {
+                    AxisMarks(values: .stride(by: .day)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                    }
+                } else {
+                    AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
+            }
+            // Keep the catmullRom trend-line overshoot inside the card.
+            .clipped()
+
+            if showMovingAverage {
+                HStack(spacing: 16) {
+                    LegendDot(color: Theme.accent.opacity(0.4), label: "Daily")
+                    LegendDot(color: Theme.accent, label: "\(movingAverageWindow)-day trend")
+                }
+                .font(.caption2)
             }
         }
     }
@@ -350,8 +418,24 @@ struct MetricTrendChart: View {
     let data: [(date: Date, value: Double)]
     let color: Color
 
+    /// Smooth only once there are enough buckets for a trend to mean something.
+    private var showMovingAverage: Bool {
+        data.count >= 6
+    }
+
+    /// ~5-bucket centered window: with weekly buckets that's roughly a monthly trend, enough
+    /// to cut the week-to-week noise without flattening real movement.
+    private var movingAverageWindow: Int { 5 }
+
+    private var movingAverageData: [(date: Date, value: Double)] {
+        guard showMovingAverage else { return [] }
+        let averaged = centeredMovingAverage(data.map(\.value), window: movingAverageWindow)
+        return zip(data, averaged).map { (date: $0.date, value: $1) }
+    }
+
     private var yDomain: ClosedRange<Double> {
-        let values = data.map(\.value)
+        // Include the smoothed values so the trend line can't fall outside the scale.
+        let values = data.map(\.value) + movingAverageData.map(\.value)
         guard let lo = values.min(), let hi = values.max() else { return 0...1 }
         if lo == hi { return (lo - 1)...(hi + 1) }
         let pad = (hi - lo) * 0.15
@@ -359,33 +443,62 @@ struct MetricTrendChart: View {
     }
 
     var body: some View {
-        Chart {
-            ForEach(data, id: \.date) { item in
-                LineMark(x: .value("Date", item.date), y: .value("Value", item.value))
-                    .foregroundStyle(color)
+        VStack(alignment: .leading, spacing: 8) {
+            Chart {
+                ForEach(data, id: \.date) { item in
+                    LineMark(
+                        x: .value("Date", item.date),
+                        y: .value("Value", item.value),
+                        series: .value("Series", "Raw")
+                    )
+                    .foregroundStyle(color.opacity(showMovingAverage ? 0.35 : 1))
+                    .lineStyle(StrokeStyle(lineWidth: showMovingAverage ? 1.5 : 2))
                     .interpolationMethod(.catmullRom)
 
-                AreaMark(x: .value("Date", item.date), y: .value("Value", item.value))
-                    .foregroundStyle(.linearGradient(
-                        colors: [color.opacity(0.25), color.opacity(0.04)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ))
-                    .interpolationMethod(.catmullRom)
+                    AreaMark(x: .value("Date", item.date), y: .value("Value", item.value))
+                        .foregroundStyle(.linearGradient(
+                            colors: [color.opacity(showMovingAverage ? 0.12 : 0.25), color.opacity(0.04)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ))
+                        .interpolationMethod(.catmullRom)
+                }
+
+                // Smoothed moving-average trend line.
+                if showMovingAverage {
+                    ForEach(movingAverageData, id: \.date) { item in
+                        LineMark(
+                            x: .value("Date", item.date),
+                            y: .value("Trend", item.value),
+                            series: .value("Series", "Trend")
+                        )
+                        .foregroundStyle(color)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .interpolationMethod(.catmullRom)
+                    }
+                }
+            }
+            .chartYScale(domain: yDomain)
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            // Keep the catmullRom area/line overshoot inside the card.
+            .clipped()
+
+            if showMovingAverage {
+                HStack(spacing: 16) {
+                    LegendDot(color: color.opacity(0.4), label: "Weekly")
+                    LegendDot(color: color, label: "Trend")
+                }
+                .font(.caption2)
             }
         }
-        .chartYScale(domain: yDomain)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading)
-        }
-        // Keep the catmullRom area/line overshoot inside the card.
-        .clipped()
     }
 }
 
