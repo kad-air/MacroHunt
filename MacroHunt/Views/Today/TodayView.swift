@@ -510,44 +510,18 @@ struct ReflectionSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
 
-                    if let r = reflection.current {
-                        Text(r.headline)
-                            .font(.system(size: 26, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Theme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 20)
-
-                        SectionHeader(title: "What I noticed")
-                            .padding(.top, 24)
-                            .padding(.bottom, 16)
-
-                        ForEach(Array(r.observations.enumerated()), id: \.offset) { index, text in
-                            HStack(alignment: .top, spacing: 13) {
-                                Circle()
-                                    .fill(observationColors[index % observationColors.count])
-                                    .frame(width: 8, height: 8)
-                                    .padding(.top, 7)
-                                Text(text)
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(Theme.ink)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .padding(.bottom, 16)
-                        }
-
-                        ideaCard(r.suggestion)
-
-                        Text(r.encouragement)
-                            .font(.system(size: 15.5))
-                            .foregroundStyle(Theme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 14)
-                            .overlay(alignment: .leading) {
-                                Rectangle().fill(Theme.accent).frame(width: 2)
-                            }
-                            .padding(.top, 22)
-
+                    switch reflection.state {
+                    case .ready(let r):
+                        readyContent(r)
                         footer
+                    case .loading:
+                        loadingState
+                        footer
+                    case .failed(let message):
+                        failedState(message)
+                        footer
+                    case .idle:
+                        EmptyView()
                     }
                 }
                 .padding(.horizontal, 24)
@@ -557,6 +531,79 @@ struct ReflectionSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private func readyContent(_ r: CoachingReflection) -> some View {
+        Text(r.headline)
+            .font(.system(size: 26, weight: .heavy, design: .rounded))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 20)
+
+        SectionHeader(title: "What I noticed")
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+        ForEach(Array(r.observations.enumerated()), id: \.offset) { index, text in
+            HStack(alignment: .top, spacing: 13) {
+                Circle()
+                    .fill(observationColors[index % observationColors.count])
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 7)
+                Text(text)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.bottom, 16)
+        }
+
+        ideaCard(r.suggestion)
+
+        Text(r.encouragement)
+            .font(.system(size: 15.5))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.leading, 14)
+            .overlay(alignment: .leading) {
+                Rectangle().fill(Theme.accent).frame(width: 2)
+            }
+            .padding(.top, 22)
+    }
+
+    /// Shown while a reflection is (re)generating, so the pane never goes blank with no hint.
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(Theme.accent)
+            Text("Reflecting on your day…")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.ink2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+        .padding(.bottom, 60)
+    }
+
+    private func failedState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Theme.ink3)
+            Text("Reflection unavailable right now")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Theme.ink)
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.ink2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+        .padding(.bottom, 40)
     }
 
     private var header: some View {
