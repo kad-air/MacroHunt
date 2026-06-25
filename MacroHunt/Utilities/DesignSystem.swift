@@ -65,10 +65,11 @@ enum Theme {
     static let glassInset  = Color(light: UIColor(white: 1, alpha: 0.70), dark: UIColor(white: 1, alpha: 0.08))
 }
 
-// MARK: - Warm background
+// MARK: - Green-harmonized background
 
-/// The full-bleed warm gradient field behind every screen: a base vertical gradient
-/// with three soft radial glows (two warm at the top, one cool at the bottom).
+/// The full-bleed gradient field behind every screen: a base vertical gradient with
+/// three soft radial glows (two sage/green at the top, one cool teal at the bottom).
+/// The glows are tinted to harmonize with the green accent rather than fight it.
 struct WarmBackground: View {
     @Environment(\.colorScheme) private var scheme
 
@@ -79,35 +80,35 @@ struct WarmBackground: View {
             let maxSide = max(w, h)
 
             ZStack {
-                // Base vertical wash
+                // Base vertical wash — neutral dark / soft off-white with a faint green lean.
                 LinearGradient(
                     colors: scheme == .dark
-                        ? [Color(red: 0.102, green: 0.086, blue: 0.067), Color(red: 0.075, green: 0.063, blue: 0.035)]
-                        : [Color(red: 0.984, green: 0.965, blue: 0.941), Color(red: 0.953, green: 0.925, blue: 0.886)],
+                        ? [Color(red: 0.075, green: 0.090, blue: 0.078), Color(red: 0.043, green: 0.055, blue: 0.045)]
+                        : [Color(red: 0.965, green: 0.976, blue: 0.961), Color(red: 0.925, green: 0.949, blue: 0.929)],
                     startPoint: .top, endPoint: .bottom
                 )
 
-                // Warm glow, top-left
+                // Sage glow, top-left
                 radial(
                     color: scheme == .dark
-                        ? Color(red: 1.0, green: 0.55, blue: 0.24).opacity(0.22)
-                        : Color(red: 1.0, green: 0.91, blue: 0.82).opacity(0.95),
+                        ? Color(red: 0.33, green: 0.78, blue: 0.51).opacity(0.18)
+                        : Color(red: 0.83, green: 0.93, blue: 0.86).opacity(0.95),
                     center: UnitPoint(x: 0.16, y: -0.02), radius: maxSide * 0.8
                 )
 
-                // Warm glow, top-right
+                // Soft green glow, top-right
                 radial(
                     color: scheme == .dark
-                        ? Color(red: 1.0, green: 0.47, blue: 0.31).opacity(0.15)
-                        : Color(red: 0.984, green: 0.851, blue: 0.769).opacity(0.9),
+                        ? Color(red: 0.30, green: 0.72, blue: 0.57).opacity(0.13)
+                        : Color(red: 0.87, green: 0.94, blue: 0.90).opacity(0.9),
                     center: UnitPoint(x: 0.92, y: 0.12), radius: maxSide * 0.7
                 )
 
-                // Cool glow, bottom
+                // Cool teal glow, bottom
                 radial(
                     color: scheme == .dark
-                        ? Color(red: 0.27, green: 0.43, blue: 0.63).opacity(0.20)
-                        : Color(red: 0.906, green: 0.933, blue: 0.965).opacity(0.95),
+                        ? Color(red: 0.24, green: 0.47, blue: 0.45).opacity(0.18)
+                        : Color(red: 0.898, green: 0.949, blue: 0.937).opacity(0.95),
                     center: UnitPoint(x: 0.70, y: 1.02), radius: maxSide * 0.85
                 )
             }
@@ -121,7 +122,7 @@ struct WarmBackground: View {
 }
 
 /// Back-compat alias — every screen uses `LiquidGlassBackground()` as its backdrop.
-/// It now renders the warm gradient field.
+/// It now renders the green-harmonized gradient field.
 struct LiquidGlassBackground: View {
     var body: some View { WarmBackground() }
 }
