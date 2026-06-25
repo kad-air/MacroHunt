@@ -215,8 +215,8 @@ struct AddMealView: View {
 
     private func analyzePhotos() {
         guard canAnalyze else { return }
-        guard credentials.isValid else {
-            errorMessage = "Please configure your API credentials in Settings."
+        guard credentials.isAIConfigured else {
+            errorMessage = "Please add your Claude API key in Settings."
             return
         }
 

@@ -16,8 +16,9 @@ class MealRepository: ObservableObject {
 
     /// Saves meal to both Craft and local DB. If Craft fails, local save is skipped.
     func saveMealWithSync(_ meal: Meal) async throws {
-        // Try Craft first - if it fails, don't save locally
-        if credentials.isValid {
+        // Try Craft first - if it fails, don't save locally. Skipped entirely when the user
+        // hasn't opted into Craft sync or hasn't configured it, so meals still log locally.
+        if credentials.craftSyncActive {
             let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
 
             // Create the meal item in Craft
@@ -52,8 +53,8 @@ class MealRepository: ObservableObject {
 
     /// Deletes meal from both Craft and local DB.
     func deleteMealWithSync(_ meal: Meal) async throws {
-        // Delete from Craft first if it exists there
-        if credentials.isValid, let craftDocId = meal.craftDocId {
+        // Delete from Craft first if it exists there and sync is active
+        if credentials.craftSyncActive, let craftDocId = meal.craftDocId {
             let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
             try await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
         }
