@@ -434,10 +434,19 @@ struct Sparkline: View {
 struct MetricTrendChart: View {
     let data: [(date: Date, value: Double)]
     let color: Color
+    /// Where the still-running current bucket is heading, drawn as a dotted lead-out from the
+    /// last completed bucket. `nil` for metrics/ranges with nothing to project.
+    var projection: (date: Date, value: Double)? = nil
 
     /// Smooth only once there are enough buckets for a trend to mean something.
     private var showMovingAverage: Bool {
         data.count >= 6
+    }
+
+    /// The dotted projection segment: last completed bucket → projected partial bucket.
+    private var projectionSegment: [(date: Date, value: Double)] {
+        guard let projection, let anchor = data.last else { return [] }
+        return [anchor, projection]
     }
 
     /// Multi-year spans show the year instead of the day so the axis doesn't repeat
@@ -455,8 +464,8 @@ struct MetricTrendChart: View {
     }
 
     private var yDomain: ClosedRange<Double> {
-        // Include the smoothed values so the trend line can't fall outside the scale.
-        let values = data.map(\.value) + movingAverageData.map(\.value)
+        // Include the smoothed and projected values so neither line falls outside the scale.
+        let values = data.map(\.value) + movingAverageData.map(\.value) + projectionSegment.map(\.value)
         guard let lo = values.min(), let hi = values.max() else { return 0...1 }
         if lo == hi { return (lo - 1)...(hi + 1) }
         let pad = (hi - lo) * 0.15
@@ -498,6 +507,27 @@ struct MetricTrendChart: View {
                         .interpolationMethod(.catmullRom)
                     }
                 }
+
+                // Dotted lead-out projecting where the current (partial) bucket is heading.
+                ForEach(projectionSegment, id: \.date) { item in
+                    LineMark(
+                        x: .value("Date", item.date),
+                        y: .value("Projected", item.value),
+                        series: .value("Series", "Projected")
+                    )
+                    .foregroundStyle(color.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 4]))
+                }
+                if let projection {
+                    PointMark(
+                        x: .value("Date", projection.date),
+                        y: .value("Projected", projection.value)
+                    )
+                    .foregroundStyle(color.opacity(0.7))
+                    .symbol {
+                        Circle().strokeBorder(color.opacity(0.8), lineWidth: 1.5).frame(width: 8, height: 8)
+                    }
+                }
             }
             .chartYScale(domain: yDomain)
             .chartXAxis {
@@ -516,10 +546,15 @@ struct MetricTrendChart: View {
             // Keep the catmullRom area/line overshoot inside the card.
             .clipped()
 
-            if showMovingAverage {
+            if showMovingAverage || projection != nil {
                 HStack(spacing: 16) {
-                    LegendDot(color: color.opacity(0.4), label: "Samples")
-                    LegendDot(color: color, label: "Trend")
+                    if showMovingAverage {
+                        LegendDot(color: color.opacity(0.4), label: "Samples")
+                        LegendDot(color: color, label: "Trend")
+                    }
+                    if projection != nil {
+                        LegendDot(color: color.opacity(0.7), label: "Projected")
+                    }
                 }
                 .font(.caption2)
             }

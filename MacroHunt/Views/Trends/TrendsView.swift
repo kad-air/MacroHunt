@@ -72,6 +72,17 @@ enum HealthMetricID: String, CaseIterable, Identifiable {
         }
     }
 
+    /// True for metrics whose buckets are *totals* (steps, energy, workout counts) rather than
+    /// averages. Only these dip on a partial current bucket — a half-finished week simply sums
+    /// to less — so they get the incomplete-bucket trimming + projection in the detail chart.
+    /// Average metrics (resting HR, HRV, …) read fine over a partial week and are left as-is.
+    var aggregatesCumulatively: Bool {
+        switch self {
+        case .steps, .activeEnergy, .workouts: return true
+        default: return false
+        }
+    }
+
     func format(_ value: Double) -> String {
         switch self {
         case .vo2Max:
@@ -123,6 +134,62 @@ enum TrendRange: String, CaseIterable, Identifiable {
         case .threeYears, .fiveYears: return 30
         }
     }
+}
+
+// MARK: - Incomplete-bucket projection
+
+/// Result of forgiving a still-running final bucket in a long-range trend series.
+struct BucketProjection {
+    /// The buckets that are fully elapsed — what the solid trend line should plot.
+    let complete: [(date: Date, value: Double)]
+    /// Where the current (partial) bucket is heading, drawn as a dotted lead-out. `nil` when
+    /// there's nothing to project (non-cumulative metric, complete final bucket, too little
+    /// history, or too early in the bucket to project reliably).
+    let projected: (date: Date, value: Double)?
+}
+
+/// Splits a weekly/monthly-bucketed series into the buckets that are fully elapsed and an
+/// optional projection for a still-running final bucket. The current week/month is only
+/// partway through, so its cumulative total (steps, energy, workouts) reads as a sharp dive;
+/// we drop it from the solid trend and instead estimate where it's heading — the partial total
+/// scaled to the full interval at the current pace — anchored at the bucket start so the dotted
+/// point lands where the next solid point would.
+///
+/// Returns the series unchanged (no projection) when the metric isn't cumulative, the final
+/// bucket is already complete, or trimming would leave too little to plot. Average metrics are
+/// passed through untouched — an average over a partial week is still a valid average.
+func projectIncompleteBucket(
+    _ series: [(date: Date, value: Double)],
+    intervalDays: Int,
+    isCumulative: Bool,
+    now: Date = Date()
+) -> BucketProjection {
+    guard isCumulative, intervalDays > 1, let last = series.last else {
+        return BucketProjection(complete: series, projected: nil)
+    }
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: now)
+    let bucketStart = calendar.startOfDay(for: last.date)
+    // Days of this bucket that have begun — includes today, which is itself still partial.
+    let elapsed = (calendar.dateComponents([.day], from: bucketStart, to: today).day ?? 0) + 1
+
+    // Final bucket is actually complete (or the data ends in the past): nothing to forgive.
+    guard elapsed >= 1, elapsed < intervalDays else {
+        return BucketProjection(complete: series, projected: nil)
+    }
+    // Need at least two complete buckets left to keep a meaningful trimmed line.
+    guard series.count >= 3 else {
+        return BucketProjection(complete: series, projected: nil)
+    }
+
+    let complete = Array(series.dropLast())
+    // Project from the current bucket's running pace, but only once a couple of days have
+    // elapsed — scaling up day one of the week (×7) would swing wildly. Below that we still
+    // drop the dive; we just don't draw a projection.
+    let projected: (date: Date, value: Double)? = elapsed >= 2
+        ? (date: last.date, value: last.value * Double(intervalDays) / Double(elapsed))
+        : nil
+    return BucketProjection(complete: complete, projected: projected)
 }
 
 // MARK: - Health Trends View Model (Phase 2)
@@ -211,10 +278,17 @@ final class HealthTrendsViewModel: ObservableObject {
         vo2Max = await vo2Task
         cardioRecovery = await recoveryTask
 
+        // Drop the still-running current week from the cumulative-total sparklines so the tile
+        // trend doesn't end on a misleading dip (same incomplete-week problem as the detail
+        // chart, just without the dotted projection at this size). Average metrics are fine.
+        func completedCumulative(_ series: [(date: Date, value: Double)]) -> [Double] {
+            projectIncompleteBucket(series, intervalDays: 7, isCumulative: true).complete.map(\.value)
+        }
+
         sparklines = [
-            .steps: (await sparkStepsTask).map(\.value),
-            .activeEnergy: (await sparkActiveTask).map(\.value),
-            .workouts: (await sparkWorkoutsTask).map(\.value),
+            .steps: completedCumulative(await sparkStepsTask),
+            .activeEnergy: completedCumulative(await sparkActiveTask),
+            .workouts: completedCumulative(await sparkWorkoutsTask),
             .restingHR: (await sparkRestingTask).map(\.value),
             .hrv: (await sparkHrvTask).map(\.value),
             .vo2Max: (await sparkVo2Task).map(\.value),
@@ -755,6 +829,15 @@ struct HealthMetricDetailView: View {
     @State private var series: [(date: Date, value: Double)] = []
     @State private var isLoading = true
 
+    /// The raw series with a still-running final bucket trimmed off (for cumulative metrics) and
+    /// a dotted projection for where the current week is heading. Everything downstream — chart,
+    /// summary stats — works off this so the partial week never reads as a real low point.
+    private var projection: BucketProjection {
+        projectIncompleteBucket(series, intervalDays: range.intervalDays, isCumulative: metric.aggregatesCumulatively)
+    }
+
+    private var displaySeries: [(date: Date, value: Double)] { projection.complete }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -777,8 +860,8 @@ struct HealthMetricDetailView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
 
-                                if series.count >= 2 {
-                                    MetricTrendChart(data: series, color: metric.color)
+                                if displaySeries.count >= 2 {
+                                    MetricTrendChart(data: displaySeries, color: metric.color, projection: projection.projected)
                                         .frame(height: 220)
                                 } else if isLoading {
                                     ProgressView()
@@ -795,7 +878,7 @@ struct HealthMetricDetailView: View {
                         }
                         .padding(.horizontal)
 
-                        if !series.isEmpty {
+                        if !displaySeries.isEmpty {
                             summaryCard
                                 .padding(.horizontal)
                         }
@@ -815,7 +898,9 @@ struct HealthMetricDetailView: View {
     }
 
     private var summaryCard: some View {
-        let values = series.map(\.value)
+        // Built from the completed buckets (partial current week excluded), so "Latest"/"Low"
+        // reflect a real full week rather than a half-finished one.
+        let values = displaySeries.map(\.value)
         let latest = values.last ?? 0
         let average = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
         let low = values.min() ?? 0
