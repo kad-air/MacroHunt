@@ -17,6 +17,17 @@ struct APIConfigurationView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             SectionHeader(title: "Craft API", icon: "doc.text.fill")
 
+                            Toggle(isOn: $credentials.craftSyncEnabled) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Sync meals to Craft")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Optional. When off, meals are still logged locally and analyzed by Claude — nothing is sent to Craft.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .tint(Theme.accent)
+
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("API Token")
                                     .font(.caption)
@@ -64,12 +75,18 @@ struct APIConfigurationView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             SectionHeader(title: "Status", icon: "info.circle")
 
-                            HStack {
-                                Image(systemName: credentials.isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundColor(credentials.isValid ? .green : .red)
-                                Text(credentials.isValid ? "All credentials configured" : "Missing credentials")
-                                    .font(.subheadline)
-                            }
+                            statusRow(
+                                ok: credentials.isAIConfigured,
+                                onText: "AI analysis ready",
+                                offText: "Claude API key needed to log meals"
+                            )
+
+                            statusRow(
+                                ok: credentials.craftSyncActive,
+                                onText: "Craft sync on",
+                                offText: craftStatusOffText,
+                                neutral: !credentials.craftSyncEnabled || !credentials.isCraftConfigured
+                            )
 
                             if let error = credentials.configurationError {
                                 Text(error)
@@ -105,6 +122,23 @@ struct APIConfigurationView: View {
             }
         } message: {
             Text("This will remove all stored API keys and tokens.")
+        }
+    }
+
+    private var craftStatusOffText: String {
+        if !credentials.isCraftConfigured { return "Craft not set up (optional)" }
+        return "Craft sync paused"
+    }
+
+    /// A single status line. `ok` shows a green check; otherwise a neutral or red indicator
+    /// depending on `neutral` — an unconfigured *optional* Craft isn't an error.
+    @ViewBuilder
+    private func statusRow(ok: Bool, onText: String, offText: String, neutral: Bool = false) -> some View {
+        HStack {
+            Image(systemName: ok ? "checkmark.circle.fill" : (neutral ? "minus.circle.fill" : "xmark.circle.fill"))
+                .foregroundColor(ok ? .green : (neutral ? .secondary : .red))
+            Text(ok ? onText : offText)
+                .font(.subheadline)
         }
     }
 }

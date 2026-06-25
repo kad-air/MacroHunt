@@ -217,8 +217,8 @@ struct SettingsView: View {
                     ConnectionRow(
                         icon: "tray.full",
                         label: "Craft Docs sync",
-                        sublabel: "Saved to your Meal Tracker",
-                        trailing: craftConfigured ? .pill("Connected") : .chevron("Set up")
+                        sublabel: craftSyncSublabel,
+                        trailing: craftSyncTrailing
                     )
                 }
                 .buttonStyle(.plain)
@@ -236,8 +236,14 @@ struct SettingsView: View {
         }
     }
 
-    private var craftConfigured: Bool {
-        !credentials.craftToken.isEmpty && !credentials.spaceId.isEmpty && !credentials.collectionId.isEmpty
+    private var craftSyncSublabel: String {
+        if !credentials.isCraftConfigured { return "Optional · mirror meals to Craft" }
+        return credentials.craftSyncEnabled ? "Saved to your Meal Tracker" : "Sync paused"
+    }
+
+    private var craftSyncTrailing: ConnectionRow.Trailing {
+        guard credentials.isCraftConfigured else { return .chevron("Set up") }
+        return credentials.craftSyncEnabled ? .pill("On") : .chevron("Off")
     }
 
     @ViewBuilder

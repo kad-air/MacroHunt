@@ -179,6 +179,17 @@ class CredentialsManager: ObservableObject {
         }
     }
 
+    /// Opt-out: mirror logged meals to Craft Docs. Defaults on so existing users keep
+    /// syncing after an update. Only has an effect when Craft is fully configured
+    /// (`isCraftConfigured`); `craftSyncActive` combines the two. Turning this off — or
+    /// simply never configuring Craft — lets meal logging and AI analysis work on their own.
+    @Published var craftSyncEnabled: Bool {
+        didSet {
+            guard !isInitializing else { return }
+            defaults?.set(craftSyncEnabled, forKey: "craftSyncEnabled")
+        }
+    }
+
     /// Whether a weight target has been set (non-zero).
     var hasWeightGoal: Bool { weightGoalKg > 0 }
 
@@ -231,12 +242,36 @@ class CredentialsManager: ObservableObject {
         // Daily reflection defaults on, but honor a stored "off".
         self.dailyReflectionEnabled = defaults?.object(forKey: "dailyReflectionEnabled") as? Bool ?? true
 
+        // Craft sync defaults on (so existing users keep syncing after this update), but
+        // honor a stored "off".
+        self.craftSyncEnabled = defaults?.object(forKey: "craftSyncEnabled") as? Bool ?? true
+
         // Done initializing - future changes will save
         isInitializing = false
     }
 
+    /// True when every credential — both AI and Craft — is filled in. Used only as a
+    /// "fully set up" indicator; it does **not** gate meal logging. AI analysis needs only
+    /// `isAIConfigured`, and Craft sync needs only `craftSyncActive`.
     var isValid: Bool {
-        !craftToken.isEmpty && !spaceId.isEmpty && !anthropicKey.isEmpty && !collectionId.isEmpty
+        isAIConfigured && isCraftConfigured
+    }
+
+    /// AI meal analysis (and reflections) need only the Anthropic key. This is what gates
+    /// logging — a user can analyze and save meals locally without ever touching Craft.
+    var isAIConfigured: Bool {
+        !anthropicKey.isEmpty
+    }
+
+    /// Craft Docs sync needs all three Craft fields. Independent of the AI key.
+    var isCraftConfigured: Bool {
+        !craftToken.isEmpty && !spaceId.isEmpty && !collectionId.isEmpty
+    }
+
+    /// Whether meals should actually be mirrored to Craft: the user has opted in *and* Craft
+    /// is configured. This is the single gate the repository checks.
+    var craftSyncActive: Bool {
+        craftSyncEnabled && isCraftConfigured
     }
 
     var configurationError: String? {

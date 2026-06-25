@@ -26,7 +26,8 @@ struct MacroHuntApp: App {
                 .environmentObject(credentials)
                 .tint(Theme.accent)
                 .onAppear {
-                    if !credentials.isValid {
+                    // Craft is optional, so onboarding only blocks until the AI key is set.
+                    if !credentials.isAIConfigured {
                         showingOnboarding = true
                     }
                 }

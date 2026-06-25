@@ -24,7 +24,7 @@ struct OnboardingView: View {
             VStack(spacing: 24) {
                 // Progress indicator
                 HStack(spacing: 8) {
-                    ForEach(0..<4) { step in
+                    ForEach(0..<3) { step in
                         Capsule()
                             .fill(step <= currentStep ? Theme.accent : Theme.ink3)
                             .frame(height: 4)
@@ -38,17 +38,13 @@ struct OnboardingView: View {
                     welcomeStep
                         .tag(0)
 
-                    // Step 2: Craft Setup
-                    craftSetupStep
+                    // Step 2: Claude Setup (required — gates logging)
+                    claudeSetupStep
                         .tag(1)
 
-                    // Step 3: Claude Setup
-                    claudeSetupStep
-                        .tag(2)
-
-                    // Step 4: Apple Health
+                    // Step 3: Apple Health
                     healthKitStep
-                        .tag(3)
+                        .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -65,7 +61,7 @@ struct OnboardingView: View {
 
                     Spacer()
 
-                    if currentStep < 3 {
+                    if currentStep < 2 {
                         Button("Next") {
                             withAnimation { currentStep += 1 }
                         }
@@ -75,14 +71,14 @@ struct OnboardingView: View {
                             dismiss()
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(!credentials.isValid)
+                        .disabled(!credentials.isAIConfigured)
                     }
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
             }
         }
-        .interactiveDismissDisabled(!credentials.isValid)
+        .interactiveDismissDisabled(!credentials.isAIConfigured)
     }
 
     // MARK: - Step Views
@@ -98,7 +94,7 @@ struct OnboardingView: View {
                 Text("Welcome to MacroHunt")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
 
-                Text("Track your meals with AI-powered nutritional analysis and sync to Craft Docs.")
+                Text("Track your meals with AI-powered nutritional analysis.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -107,58 +103,9 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     FeatureRow(icon: "camera.fill", color: .blue, title: "Photo Analysis", description: "Snap photos of your meals for instant macro estimates")
                     FeatureRow(icon: "chart.line.uptrend.xyaxis", color: .green, title: "Track Trends", description: "Monitor your nutrition over time with charts")
-                    FeatureRow(icon: "doc.text.fill", color: .purple, title: "Craft Sync", description: "All meals saved to your Craft collection")
+                    FeatureRow(icon: "heart.fill", color: .red, title: "Apple Health", description: "Optionally sync meals and read your weight & activity")
                 }
                 .padding()
-            }
-            .padding()
-        }
-    }
-
-    private var craftSetupStep: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Image(systemName: "doc.badge.gearshape.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                    .padding(.top, 40)
-
-                Text("Connect to Craft")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-
-                Text("Enter your Craft API credentials to sync meals.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-
-                GlassCard {
-                    VStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("API Token")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            SecureField("Craft API token", text: $credentials.craftToken)
-                                .inputFieldStyle()
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Space ID")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            TextField("Your Space ID", text: $credentials.spaceId)
-                                .inputFieldStyle()
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Collection ID")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            TextField("Meal Tracker collection ID", text: $credentials.collectionId)
-                                .inputFieldStyle()
-                        }
-                    }
-                }
-                .padding(.horizontal)
             }
             .padding()
         }
@@ -313,7 +260,7 @@ struct OnboardingView: View {
                 .padding(.horizontal)
 
                 // Status
-                if credentials.isValid {
+                if credentials.isAIConfigured {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
