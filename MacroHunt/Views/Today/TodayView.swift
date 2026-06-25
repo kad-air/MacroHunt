@@ -69,10 +69,10 @@ struct TodayView: View {
             }
             .navigationBarHidden(true)
             .task(id: reflectionTaskKey) {
-                await reflection.ensureLoaded(modelContext: modelContext, credentials: credentials)
+                await reflection.ensureLoaded(mealCount: todayMeals.count, modelContext: modelContext, credentials: credentials)
             }
             .sheet(isPresented: $showReflection) {
-                ReflectionSheet(reflection: reflection, modelContext: modelContext, credentials: credentials)
+                ReflectionSheet(reflection: reflection, modelContext: modelContext, credentials: credentials, mealCount: todayMeals.count)
             }
             .alert("Delete Failed", isPresented: Binding(
                 get: { deleteError != nil },
@@ -326,6 +326,9 @@ final class ReflectionViewModel: ObservableObject {
     @Published private(set) var state: State = .idle
 
     private var loadedDay: String?
+    /// The number of meals logged today that the current reflection reflects. When a meal is
+    /// added (or removed), this no longer matches and the reflection regenerates.
+    private var loadedMealCount: Int?
 
     var current: CoachingReflection? {
         if case .ready(let r) = state { return r }
@@ -334,22 +337,27 @@ final class ReflectionViewModel: ObservableObject {
 
     private static let cacheDayKey = "reflection.cache.day"
     private static let cacheJSONKey = "reflection.cache.json"
+    private static let cacheMealCountKey = "reflection.cache.mealCount"
 
-    /// Loads today's reflection: from the in-memory/disk cache if present, otherwise
-    /// generates a fresh one (only when reflections are on and a key is configured).
-    func ensureLoaded(modelContext: ModelContext, credentials: CredentialsManager) async {
+    /// Loads today's reflection: from the in-memory/disk cache when it still matches today's
+    /// meal count, otherwise generates a fresh one (only when reflections are on and a key is
+    /// configured). Called from a `.task(id:)` keyed on the meal count, so logging a meal
+    /// re-fires this asynchronously and triggers a regenerate without blocking the add flow.
+    func ensureLoaded(mealCount: Int, modelContext: ModelContext, credentials: CredentialsManager) async {
         guard credentials.dailyReflectionEnabled else {
             state = .idle
             return
         }
         let today = TodayView.dayKey(Date())
 
-        // Already have today's in this session.
-        if loadedDay == today, case .ready = state { return }
+        // Already have today's in this session, and it reflects the current meals.
+        if loadedDay == today, loadedMealCount == mealCount, case .ready = state { return }
 
-        // Disk cache for today (survives relaunch, avoids re-billing the API).
-        if let cached = Self.readCache(forDay: today) {
+        // Disk cache for today (survives relaunch, avoids re-billing the API) — only reusable
+        // while the logged-meal count is unchanged.
+        if let cached = Self.readCache(forDay: today, mealCount: mealCount) {
             loadedDay = today
+            loadedMealCount = mealCount
             state = .ready(cached)
             return
         }
@@ -358,12 +366,13 @@ final class ReflectionViewModel: ObservableObject {
             state = .idle
             return
         }
-        await generate(force: false, modelContext: modelContext, credentials: credentials)
+        await generate(force: false, mealCount: mealCount, modelContext: modelContext, credentials: credentials)
     }
 
-    /// Generates a new reflection. `force` bypasses the "already loaded today" guard for the
-    /// Regenerate button.
-    func generate(force: Bool, modelContext: ModelContext, credentials: CredentialsManager) async {
+    /// Generates a new reflection. `force` bypasses the "already loading" guard for the
+    /// Regenerate button. `mealCount` is the number of meals logged today that this reflection
+    /// will reflect, so the cache can be invalidated when it next changes.
+    func generate(force: Bool, mealCount: Int, modelContext: ModelContext, credentials: CredentialsManager) async {
         guard !credentials.anthropicKey.isEmpty else {
             state = .idle
             return
@@ -377,7 +386,8 @@ final class ReflectionViewModel: ObservableObject {
             let result = try await client.generateReflection(context: context)
             let today = TodayView.dayKey(Date())
             loadedDay = today
-            Self.writeCache(result, forDay: today)
+            loadedMealCount = mealCount
+            Self.writeCache(result, forDay: today, mealCount: mealCount)
             state = .ready(result)
         } catch {
             state = .failed(friendly(error))
@@ -457,9 +467,10 @@ final class ReflectionViewModel: ObservableObject {
 
     // MARK: Cache
 
-    private static func readCache(forDay day: String) -> CoachingReflection? {
+    private static func readCache(forDay day: String, mealCount: Int) -> CoachingReflection? {
         let defaults = UserDefaults.standard
         guard defaults.string(forKey: cacheDayKey) == day,
+              defaults.integer(forKey: cacheMealCountKey) == mealCount,
               let data = defaults.data(forKey: cacheJSONKey),
               let reflection = try? JSONDecoder().decode(CoachingReflection.self, from: data) else {
             return nil
@@ -467,11 +478,12 @@ final class ReflectionViewModel: ObservableObject {
         return reflection
     }
 
-    private static func writeCache(_ reflection: CoachingReflection, forDay day: String) {
+    private static func writeCache(_ reflection: CoachingReflection, forDay day: String, mealCount: Int) {
         let defaults = UserDefaults.standard
         if let data = try? JSONEncoder().encode(reflection) {
             defaults.set(day, forKey: cacheDayKey)
             defaults.set(data, forKey: cacheJSONKey)
+            defaults.set(mealCount, forKey: cacheMealCountKey)
         }
     }
 }
@@ -484,6 +496,7 @@ struct ReflectionSheet: View {
     @ObservedObject var reflection: ReflectionViewModel
     let modelContext: ModelContext
     let credentials: CredentialsManager
+    let mealCount: Int
 
     @Environment(\.dismiss) private var dismiss
 
@@ -605,7 +618,7 @@ struct ReflectionSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
-                Task { await reflection.generate(force: true, modelContext: modelContext, credentials: credentials) }
+                Task { await reflection.generate(force: true, mealCount: mealCount, modelContext: modelContext, credentials: credentials) }
             } label: {
                 HStack(spacing: 6) {
                     if case .loading = reflection.state {

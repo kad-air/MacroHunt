@@ -7,8 +7,10 @@ class ClaudeAPI {
     // Flip to "claude-opus-4-8" for maximum accuracy — slower, and ~$1/month more
     // at personal logging volume. Sonnet 4.6 is the right tier for this extraction task.
     private static let model = "claude-sonnet-4-6"
-    // The daily reflection is a single, quality-sensitive call — run it on Opus.
-    private static let coachingModel = "claude-opus-4-8"
+    // The daily reflection regenerates after every logged meal, so it runs on Sonnet 4.6 —
+    // fast and inexpensive enough for the higher call volume, while keeping its own session
+    // (see NetworkConfig.reflectionSession) so it never starves the user-facing analyze call.
+    private static let coachingModel = "claude-sonnet-4-6"
     private static let baseURL = "https://api.anthropic.com/v1/messages"
     private static let anthropicVersion = "2023-06-01"
 
