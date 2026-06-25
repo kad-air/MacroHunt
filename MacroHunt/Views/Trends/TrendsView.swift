@@ -87,7 +87,7 @@ enum HealthMetricID: String, CaseIterable, Identifiable {
 // MARK: - Trend Range (detail sheet)
 
 enum TrendRange: String, CaseIterable, Identifiable {
-    case threeMonths, sixMonths, year
+    case threeMonths, sixMonths, year, twoYears, threeYears, fiveYears
 
     var id: String { rawValue }
 
@@ -96,6 +96,9 @@ enum TrendRange: String, CaseIterable, Identifiable {
         case .threeMonths: return "3M"
         case .sixMonths: return "6M"
         case .year: return "1Y"
+        case .twoYears: return "2Y"
+        case .threeYears: return "3Y"
+        case .fiveYears: return "5Y"
         }
     }
 
@@ -104,6 +107,20 @@ enum TrendRange: String, CaseIterable, Identifiable {
         case .threeMonths: return 90
         case .sixMonths: return 180
         case .year: return 365
+        case .twoYears: return 730
+        case .threeYears: return 1095
+        case .fiveYears: return 1825
+        }
+    }
+
+    /// Bucket width for the long-term chart. Short ranges stay weekly; multi-year ranges
+    /// widen to bi-weekly/monthly so the chart keeps roughly 30–60 points instead of
+    /// rendering hundreds of weekly samples (and so the smoothing stays meaningful).
+    var intervalDays: Int {
+        switch self {
+        case .threeMonths, .sixMonths, .year: return 7
+        case .twoYears: return 14
+        case .threeYears, .fiveYears: return 30
         }
     }
 }
@@ -152,7 +169,6 @@ final class HealthTrendsViewModel: ObservableObject {
         isLoading = true
 
         async let unitTask = hk.preferredWeightUnit()
-        async let weightTask = hk.bodyMassSeries(days: days)
         async let latestWeightTask = hk.latestBodyMass()
         async let activeTask = hk.dailyActiveEnergy(days: days)
         async let basalTask = hk.dailyBasalEnergy(days: days)
@@ -173,7 +189,6 @@ final class HealthTrendsViewModel: ObservableObject {
         async let sparkRecoveryTask = hk.cardioRecoverySeries(days: sparklineDays, intervalDays: 7)
 
         let unit = await unitTask
-        let samples = await weightTask
         let active = await activeTask
         let basal = await basalTask
         let steps = await stepsTask
@@ -186,7 +201,6 @@ final class HealthTrendsViewModel: ObservableObject {
         let latestWeight = await latestWeightTask
 
         weightUnit = unit
-        weightSeries = samples.map { (date: $0.date, value: unit.fromKilograms($0.kilograms)) }
         latestWeightKg = latestWeight?.kilograms
         dailyExpenditure = expenditure
         avgActiveEnergy = active.isEmpty ? 0 : active.map(\.value).reduce(0, +) / Double(active.count)
@@ -209,6 +223,19 @@ final class HealthTrendsViewModel: ObservableObject {
 
         isLoading = false
         hasLoadedOnce = true
+    }
+
+    /// Body-weight trend for the inline Weight card. Driven by its own range picker, so it's
+    /// independent of the week/month overview toggle. Raw weigh-ins (no bucketing) keep the
+    /// goal line and individual measurements meaningful across both short and multi-year ranges.
+    func loadWeightTrend(days: Int) async {
+        let hk = HealthKitService.shared
+        guard hk.isHealthDataAvailable else { return }
+        async let unitTask = hk.preferredWeightUnit()
+        async let samplesTask = hk.bodyMassSeries(days: days)
+        let unit = await unitTask
+        weightUnit = unit
+        weightSeries = (await samplesTask).map { (date: $0.date, value: unit.fromKilograms($0.kilograms)) }
     }
 
     /// Long-term series for the tap-through detail sheet. Switches over the metric so the
@@ -236,6 +263,7 @@ struct TrendsView: View {
     @StateObject private var health = HealthTrendsViewModel()
 
     @State private var selectedPeriod: TimePeriod = .week
+    @State private var weightRange: TrendRange = .sixMonths
     @State private var isConnecting = false
     @State private var connectMessage: String?
     @State private var selectedMetric: HealthMetricID?
@@ -285,8 +313,10 @@ struct TrendsView: View {
                                 .padding(.horizontal)
                         }
 
-                        // Health: weight vs. target
-                        if health.hasWeightData || credentials.hasWeightGoal {
+                        // Health: weight vs. target. Anchored on the range-independent latest
+                        // weight (not the selected-range series) so the card and its range
+                        // picker stay put even when a range happens to have no weigh-ins.
+                        if health.latestWeightKg != nil || health.hasWeightData || credentials.hasWeightGoal {
                             weightSection
                                 .padding(.horizontal)
                         }
@@ -319,6 +349,11 @@ struct TrendsView: View {
             .navigationBarHidden(true)
             .task(id: selectedPeriod) {
                 await health.load(days: selectedPeriod.days)
+            }
+            // Weight trend loads on its own range, independent of the overview toggle and of
+            // whether the section is currently on screen.
+            .task(id: weightRange) {
+                await health.loadWeightTrend(days: weightRange.days)
             }
             .sheet(item: $selectedMetric) { metric in
                 HealthMetricDetailView(metric: metric, health: health)
@@ -531,6 +566,13 @@ struct TrendsView: View {
                     }
                 }
 
+                Picker("Range", selection: $weightRange) {
+                    ForEach(TrendRange.allCases) { range in
+                        Text(range.label).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 if health.hasWeightData {
                     WeightTrendChart(
                         data: health.weightSeries,
@@ -539,7 +581,7 @@ struct TrendsView: View {
                     )
                     .frame(height: 200)
                 } else {
-                    Text("No weigh-ins in this period. Record your weight in the Health app to see your trend here.")
+                    Text("No weigh-ins in this range. Record your weight in the Health app to see your trend here.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.vertical, 8)
@@ -795,7 +837,7 @@ struct HealthMetricDetailView: View {
 
     private func load() async {
         isLoading = true
-        series = await health.series(for: metric, days: range.days, intervalDays: 7)
+        series = await health.series(for: metric, days: range.days, intervalDays: range.intervalDays)
         isLoading = false
     }
 }
