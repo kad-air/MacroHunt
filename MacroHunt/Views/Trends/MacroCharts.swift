@@ -19,6 +19,15 @@ func centeredMovingAverage(_ values: [Double], window: Int) -> [Double] {
     }
 }
 
+// MARK: - Axis helpers
+
+/// True when an ordered set of dates spans more than ~13 months, so a date axis should label
+/// the year rather than the day (otherwise multi-year ranges repeat the same month label).
+func chartSpansMultipleYears(_ dates: [Date]) -> Bool {
+    guard let first = dates.first, let last = dates.last else { return false }
+    return last.timeIntervalSince(first) > 400 * 24 * 60 * 60
+}
+
 // MARK: - Calorie Trend Chart
 
 struct CalorieTrendChart: View {
@@ -309,6 +318,10 @@ struct WeightTrendChart: View {
         return (lo - pad)...(hi + pad)
     }
 
+    /// Multi-year spans show the year instead of the day so the axis doesn't repeat
+    /// the same month label across years.
+    private var spansMultipleYears: Bool { chartSpansMultipleYears(data.map(\.date)) }
+
     var body: some View {
         Chart {
             if let goal {
@@ -333,7 +346,11 @@ struct WeightTrendChart: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                if spansMultipleYears {
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                } else {
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
             }
         }
         .chartYAxis {
@@ -423,6 +440,10 @@ struct MetricTrendChart: View {
         data.count >= 6
     }
 
+    /// Multi-year spans show the year instead of the day so the axis doesn't repeat
+    /// the same month label across years.
+    private var spansMultipleYears: Bool { chartSpansMultipleYears(data.map(\.date)) }
+
     /// ~5-bucket centered window: with weekly buckets that's roughly a monthly trend, enough
     /// to cut the week-to-week noise without flattening real movement.
     private var movingAverageWindow: Int { 5 }
@@ -482,7 +503,11 @@ struct MetricTrendChart: View {
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                     AxisGridLine()
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                    if spansMultipleYears {
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                    } else {
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                    }
                 }
             }
             .chartYAxis {
@@ -493,7 +518,7 @@ struct MetricTrendChart: View {
 
             if showMovingAverage {
                 HStack(spacing: 16) {
-                    LegendDot(color: color.opacity(0.4), label: "Weekly")
+                    LegendDot(color: color.opacity(0.4), label: "Samples")
                     LegendDot(color: color, label: "Trend")
                 }
                 .font(.caption2)
