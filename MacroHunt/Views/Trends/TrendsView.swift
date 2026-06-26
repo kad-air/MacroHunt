@@ -93,6 +93,56 @@ enum HealthMetricID: String, CaseIterable, Identifiable {
             return "\(Int(value.rounded()))"
         }
     }
+
+    /// Plain-language, one-sentence definition of what the metric measures, shown on the
+    /// tap-through detail sheet. Kept supportive and non-medical — a quick orientation, not advice.
+    var definition: String {
+        switch self {
+        case .steps:
+            return "The number of steps you take each day — a simple measure of how much you move."
+        case .activeEnergy:
+            return "Calories your body burns through movement and exercise, on top of what it needs at rest."
+        case .workouts:
+            return "Dedicated exercise sessions logged by your watch or phone."
+        case .restingHR:
+            return "Your heart rate while fully at rest. A stronger, more efficient heart tends to beat fewer times per minute."
+        case .hrv:
+            return "Heart rate variability — the tiny differences in time between heartbeats. It reflects how rested and balanced your nervous system is."
+        case .vo2Max:
+            return "The most oxygen your body can use during hard exercise — a key marker of cardiovascular fitness."
+        case .cardioRecovery:
+            return "How far your heart rate falls in the minute after peak exercise. A bigger drop signals a fitter heart."
+        }
+    }
+
+    /// Whether a higher or lower value is generally the healthier direction, surfaced on the
+    /// detail sheet so the chart's trend reads at a glance. A general guide, not medical advice.
+    enum BetterDirection {
+        case higher, lower
+
+        var label: String {
+            switch self {
+            case .higher: return "Higher is better"
+            case .lower: return "Lower is better"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .higher: return "arrow.up.right"
+            case .lower: return "arrow.down.right"
+            }
+        }
+    }
+
+    var betterDirection: BetterDirection {
+        switch self {
+        // A lower resting heart rate generally reflects a stronger, more efficient heart.
+        case .restingHR: return .lower
+        // Steps, energy, workouts, HRV, VO₂ Max, and cardio recovery all trend healthier higher.
+        default: return .higher
+        }
+    }
 }
 
 // MARK: - Trend Range (detail sheet)
@@ -878,6 +928,9 @@ struct HealthMetricDetailView: View {
                         }
                         .padding(.horizontal)
 
+                        aboutCard
+                            .padding(.horizontal)
+
                         if !displaySeries.isEmpty {
                             summaryCard
                                 .padding(.horizontal)
@@ -916,6 +969,33 @@ struct HealthMetricDetailView: View {
                     HealthMetricTile(title: "Low", value: metric.format(low), unit: metric.detailUnit, caption: nil, color: metric.color)
                     HealthMetricTile(title: "High", value: metric.format(high), unit: metric.detailUnit, caption: nil, color: metric.color)
                 }
+            }
+        }
+    }
+
+    /// Plain-language explainer: what the metric measures and which way is generally healthier.
+    /// Shown on every metric's detail sheet so the chart isn't just a number without context.
+    private var aboutCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "About", icon: "info.circle")
+
+                Text(metric.definition)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    Image(systemName: metric.betterDirection.icon)
+                    Text(metric.betterDirection.label)
+                }
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(metric.color)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(metric.color.opacity(0.12))
+                )
             }
         }
     }
