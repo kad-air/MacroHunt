@@ -12,35 +12,47 @@ class MealRepository: ObservableObject {
         self.credentials = credentials
     }
 
-    // MARK: - Combined Save (Transactional)
+    // MARK: - Combined Save (local-first)
 
-    /// Saves meal to both Craft and local DB. If Craft fails, local save is skipped.
+    /// Saves a meal **local-first**: local SwiftData is the source of truth and the only
+    /// step that can fail the log. Craft Docs and Apple Health are equal, *best-effort*
+    /// mirrors that run after the local save and never throw — a mirror failure must never
+    /// undo a logged meal.
+    ///
+    /// This inverts the app's earlier "Craft-first transactional" order. The product is
+    /// local/on-device with Apple Health as the real store; Craft is an optional export, not
+    /// a gate, so a Craft outage or a user who never configured Craft can still log normally.
+    /// (See `docs/managed-key-proxy-plan.md` for the related paid-tier direction.)
     func saveMealWithSync(_ meal: Meal) async throws {
-        // Try Craft first - if it fails, don't save locally. Skipped entirely when the user
-        // hasn't opted into Craft sync or hasn't configured it, so meals still log locally.
-        if credentials.craftSyncActive {
-            let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
-
-            // Create the meal item in Craft
-            let docId = try await craftAPI.createMealItem(
-                collectionId: credentials.collectionId,
-                meal: meal
-            )
-            meal.craftDocId = docId
-
-            // Add photos and description to the document
-            if !meal.photoData.isEmpty || !meal.notes.isEmpty {
-                try await craftAPI.addMealContent(documentId: docId, photoData: meal.photoData, description: meal.notes)
-            }
-        }
-
-        // Craft succeeded (or was skipped), now save locally
+        // 1. Authoritative write: local SwiftData. If this throws, the meal did not log and
+        //    the error propagates to the caller.
         modelContext.insert(meal)
         try modelContext.save()
 
-        // Best-effort: mirror the meal into Apple Health. This runs only after the
-        // load-bearing Craft → SwiftData save has succeeded, and never throws — a
-        // HealthKit failure or denied permission must not undo a logged meal.
+        // 2. Best-effort mirror: Craft Docs. Gated on the user's opt-in; never throws and
+        //    never undoes the local save. The doc id is persisted as soon as the item is
+        //    created so a later delete can still clean Craft up even if the content upload
+        //    (photos/notes) fails.
+        if credentials.craftSyncActive {
+            let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
+            do {
+                let docId = try await craftAPI.createMealItem(
+                    collectionId: credentials.collectionId,
+                    meal: meal
+                )
+                meal.craftDocId = docId
+                try? modelContext.save()
+
+                if !meal.photoData.isEmpty || !meal.notes.isEmpty {
+                    try await craftAPI.addMealContent(documentId: docId, photoData: meal.photoData, description: meal.notes)
+                }
+            } catch {
+                // Mirror failed — leave the logged meal intact and (possibly) unsynced. The
+                // local DB is still correct; we do not surface this or roll anything back.
+            }
+        }
+
+        // 3. Best-effort mirror: Apple Health. Same contract — gated, never throws.
         if credentials.healthKitSyncEnabled {
             if let hkUUID = try? await HealthKitService.shared.saveMeal(meal) {
                 meal.healthKitFoodUUID = hkUUID
@@ -49,23 +61,26 @@ class MealRepository: ObservableObject {
         }
     }
 
-    // MARK: - Combined Delete
+    // MARK: - Combined Delete (local-first)
 
-    /// Deletes meal from both Craft and local DB.
+    /// Deletes a meal **local-first**: the best-effort mirrors (Craft, Apple Health) are
+    /// removed first — while their identifiers are still on the meal — then the authoritative
+    /// local delete runs. Mirror removals never throw; only the local delete can fail the
+    /// operation. A failed mirror cleanup leaves an orphan in Craft/Health but never blocks
+    /// removing the meal the user asked to delete.
     func deleteMealWithSync(_ meal: Meal) async throws {
-        // Delete from Craft first if it exists there and sync is active
+        // 1. Best-effort: remove the Craft mirror if it was synced. Never throws.
         if credentials.craftSyncActive, let craftDocId = meal.craftDocId {
             let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
-            try await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
+            try? await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
         }
 
-        // Best-effort: remove the mirrored Apple Health entry. Done before the local
-        // delete so the UUID is still available; never throws.
+        // 2. Best-effort: remove the Apple Health mirror while the UUID is available. Never throws.
         if credentials.healthKitSyncEnabled, let hkUUID = meal.healthKitFoodUUID {
             try? await HealthKitService.shared.deleteMeal(healthKitFoodUUID: hkUUID)
         }
 
-        // Delete locally
+        // 3. Authoritative: local delete. If this throws, the meal is still logged.
         modelContext.delete(meal)
         try modelContext.save()
     }
