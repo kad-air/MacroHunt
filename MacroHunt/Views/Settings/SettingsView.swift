@@ -48,6 +48,9 @@ struct SettingsView: View {
                         section("Preferences")
                         preferencesCard
 
+                        section("Integrations")
+                        integrationsCard
+
                         appInfo
                     }
                     .padding(.horizontal, 18)
@@ -267,21 +270,12 @@ struct SettingsView: View {
 
     // MARK: - Connections
 
+    /// The two first-class connections: the required AI key and Apple Health (the canonical,
+    /// user-owned mirror). Craft lives in the separate, lower **Integrations** section now —
+    /// it's an optional export, not part of the core logging path.
     private var connectionsCard: some View {
         GlassCard(padding: 0) {
             VStack(spacing: 0) {
-                appleHealthRow
-                rowDivider
-                NavigationLink { APIConfigurationView() } label: {
-                    ConnectionRow(
-                        icon: "tray.full",
-                        label: "Craft Docs sync",
-                        sublabel: craftSyncSublabel,
-                        trailing: craftSyncTrailing
-                    )
-                }
-                .buttonStyle(.plain)
-                rowDivider
                 NavigationLink { APIConfigurationView() } label: {
                     ConnectionRow(
                         icon: "wand.and.stars",
@@ -291,13 +285,50 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                rowDivider
+                appleHealthRow
+            }
+        }
+    }
+
+    // MARK: - Integrations (optional exports)
+
+    /// Demoted, optional export targets. Meals always log on-device and to Apple Health
+    /// regardless of anything here; these just mirror them elsewhere. The "More coming" row
+    /// signals the planned Notion / Google Sheets / etc. integrations.
+    private var integrationsCard: some View {
+        GlassCard(padding: 0) {
+            VStack(spacing: 0) {
+                NavigationLink { APIConfigurationView() } label: {
+                    ConnectionRow(
+                        icon: "tray.full",
+                        label: "Craft Docs",
+                        sublabel: craftSyncSublabel,
+                        trailing: craftSyncTrailing
+                    )
+                }
+                .buttonStyle(.plain)
+                rowDivider
+                HStack(spacing: 13) {
+                    rowIcon("ellipsis")
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("More coming")
+                            .font(.system(size: 14.5, weight: .semibold))
+                            .foregroundStyle(Theme.ink2)
+                        Text("Notion, Google Sheets & more")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                    Spacer()
+                }
+                .padding(18)
             }
         }
     }
 
     private var craftSyncSublabel: String {
-        if !credentials.isCraftConfigured { return "Optional · mirror meals to Craft" }
-        return credentials.craftSyncEnabled ? "Saved to your Meal Tracker" : "Sync paused"
+        if !credentials.isCraftConfigured { return "Optional · export meals to Craft" }
+        return credentials.craftSyncEnabled ? "Exporting to your Meal Tracker" : "Export paused"
     }
 
     private var craftSyncTrailing: ConnectionRow.Trailing {

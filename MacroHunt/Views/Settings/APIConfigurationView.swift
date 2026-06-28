@@ -12,16 +12,38 @@ struct APIConfigurationView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    // API Credentials
+                    // Claude API — required to analyze & log meals. Listed first because it's
+                    // the only credential the core logging path needs.
                     GlassCard {
                         VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(title: "Craft API", icon: "doc.text.fill")
+                            SectionHeader(title: "Claude API", icon: "sparkles")
+
+                            Text("Required. Powers photo & text meal analysis. Your key is stored only in this device's Keychain — it never leaves the device.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("API Key")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                SecureField("Enter your Anthropic API key", text: $credentials.anthropicKey)
+                                    .inputFieldStyle()
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    // Craft Docs — optional export integration, demoted below the required key.
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 16) {
+                            SectionHeader(title: "Craft Docs", icon: "tray.full")
 
                             Toggle(isOn: $credentials.craftSyncEnabled) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Sync meals to Craft")
+                                    Text("Export meals to Craft")
                                         .font(.subheadline.weight(.semibold))
-                                    Text("Optional. When off, meals are still logged locally and analyzed by Claude — nothing is sent to Craft.")
+                                    Text("Optional integration. Your meals always log on-device and to Apple Health — this also mirrors them into your Craft space. When off, nothing is sent to Craft.")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -51,21 +73,10 @@ struct APIConfigurationView: View {
                                 TextField("Meal Tracker collection ID", text: $credentials.collectionId)
                                     .inputFieldStyle()
                             }
-                        }
-                    }
-                    .padding(.horizontal)
 
-                    GlassCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(title: "Claude API", icon: "sparkles")
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("API Key")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                SecureField("Enter your Anthropic API key", text: $credentials.anthropicKey)
-                                    .inputFieldStyle()
-                            }
+                            Text("More export integrations (Notion, Google Sheets) are on the way.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
                     }
                     .padding(.horizontal)
