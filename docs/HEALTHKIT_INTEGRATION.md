@@ -27,9 +27,10 @@ flows to the Fitness app and any other Health-aware app. Write-only; opt-in.
   `dietaryFatTotal` (g). Handles authorization, save, and delete-by-UUID.
 - `Models/Meal.swift` — added `healthKitFoodUUID: String?` (optional, defaults nil →
   no SwiftData migration break), mirroring how `craftDocId` links a row to Craft.
-- `Services/MealRepository.swift` — HealthKit write is a **best-effort third step
-  after** the load-bearing Craft → SwiftData save (never throws, never blocks logging).
-  Delete mirrors it, removing the Health entry before the local delete.
+- `Services/MealRepository.swift` — HealthKit write is a **best-effort mirror after**
+  the authoritative local SwiftData save (never throws, never blocks logging) — equal to
+  the Craft mirror in the local-first save path. Delete mirrors it, removing the Health
+  entry before the local delete.
 - `Utilities/CredentialsManager.swift` — `healthKitSyncEnabled` flag in app-group
   `UserDefaults` (defaults off). Independent of `isValid` — Health sync works without
   Craft configured.
