@@ -262,7 +262,15 @@ class CredentialsManager: ObservableObject {
         // Load from storage (didSet guards prevent re-saving during init)
         self.craftToken = keychain.read(service: service, account: "craftToken") ?? ""
         self.spaceId = defaults?.string(forKey: "spaceId") ?? ""
-        self.anthropicKey = keychain.read(service: service, account: "anthropicKey") ?? ""
+        // Verification aid: `MACROHUNT_DEBUG_ANTHROPIC_KEY=<key>` in the launch environment
+        // seeds the Anthropic key ONLY while nothing is stored (the didSet guard means it is
+        // never written to the keychain), so `DuoBarsUITests` and a `simctl launch` for
+        // screenshots get past onboarding with a configured-but-bogus key. Any real key the
+        // user has saved always wins.
+        let storedAnthropicKey = keychain.read(service: service, account: "anthropicKey") ?? ""
+        self.anthropicKey = storedAnthropicKey.isEmpty
+            ? (ProcessInfo.processInfo.environment["MACROHUNT_DEBUG_ANTHROPIC_KEY"] ?? "")
+            : storedAnthropicKey
         self.collectionId = defaults?.string(forKey: "collectionId") ?? ""
         self.dailyCalorieGoal = defaults?.integer(forKey: "dailyCalorieGoal") ?? 2000
 

@@ -20,53 +20,59 @@ struct AddMealView: View {
     @State private var isSaving = false
 
     var body: some View {
-        ZStack {
-            LiquidGlassBackground()
+        // A NavigationStack so the dismiss control is a real bar item with a semantic
+        // placement: the iPhone Duo moves it into its vertical bar on the cover display and
+        // centers it on the inner display. A hand-drawn xmark chip (what this replaced) never
+        // gets that treatment. The masthead stays in content; the bar's own title is removed.
+        NavigationStack {
+            ZStack {
+                LiquidGlassBackground()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if isAnalyzing {
-                        analyzingView
-                    } else if showingReview, let analysis = Binding($analysisResult) {
-                        reviewView(analysis: analysis)
-                    } else {
-                        captureView
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if isAnalyzing {
+                            analyzingView
+                        } else if showingReview, let analysis = Binding($analysisResult) {
+                            reviewView(analysis: analysis)
+                        } else {
+                            captureView
+                        }
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 40)
-            }
 
-            if isSaving { savingOverlay }
+                if isSaving { savingOverlay }
+            }
+            .navigationTitle(showingReview ? "Review meal" : "Add a meal")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar(removing: .title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", systemImage: "xmark") { dismiss() }
+                        .disabled(isSaving)
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
+            }
         }
+        // A sheet is its own presentation root and does not inherit the TabView's tint.
+        .tint(Theme.accent)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
     }
 
     // MARK: - Header
 
     private func sheetHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 19, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.ink)
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.ink2)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Theme.chip))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 12)
+        Text(title)
+            .font(.system(size: 19, weight: .bold, design: .rounded))
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
     }
 
     private func fieldLabel(_ text: String) -> some View {

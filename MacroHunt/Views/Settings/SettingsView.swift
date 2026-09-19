@@ -35,7 +35,6 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         MHHeader(kicker: "Preferences & goals", title: "Settings")
-                            .padding(.top, 8)
                             .padding(.bottom, 6)
 
                         section("Goals")
@@ -54,10 +53,10 @@ struct SettingsView: View {
                         appInfo
                     }
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 110)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationBarHidden(true)
+            .tabRootBar("Settings")
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()

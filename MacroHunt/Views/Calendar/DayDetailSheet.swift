@@ -39,13 +39,16 @@ struct DayDetailSheet: View {
             .navigationTitle(dateFormatter.string(from: date))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Title + symbol so the Duo lays it out in its vertical bar (see MainTabView).
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Done", systemImage: "checkmark") {
                         dismiss()
                     }
                 }
             }
         }
+        // A sheet is its own presentation root and does not inherit the TabView's tint.
+        .tint(Theme.accent)
     }
 
     // MARK: - Summary Section

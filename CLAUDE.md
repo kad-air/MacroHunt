@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Verify
 
-**Builds run on Xcode Cloud, not locally.** Opening a PR triggers a validation build; pushing/merging to `main` triggers the TestFlight build (a shared scheme + TestFlight automation exist for this). The way to get a change verified is to put it on a branch and open a PR — not to run a local build. There is **no test target** and no linter configured, so `xcodebuild` only ever exercises the compiler.
+**Builds run on Xcode Cloud, not locally.** Opening a PR triggers a validation build; pushing/merging to `main` triggers the TestFlight build (a shared scheme + TestFlight automation exist for this). The way to get a change verified is to put it on a branch and open a PR — not to run a local build. There is no linter configured. The one test target is **`MacroHuntUITests`** (XCUITest; `DuoBarsUITests`, the guard on the iPhone Duo bar migration below) — it rides the `MacroHunt` scheme's test action (built for testing only, never archived) and is run locally by `scripts/duo-check.sh`; Xcode Cloud only runs it if the workflow has a Test action.
 
 Optional local compile check (confirms it builds; not the team's verification path):
 
@@ -12,9 +12,17 @@ Optional local compile check (confirms it builds; not the team's verification pa
 xcodebuild -scheme MacroHunt -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
-Open `MacroHunt.xcodeproj` in Xcode for development. iOS 17+ (deployment target 17.0); SwiftUI + SwiftData + Swift Charts; bundle id `com.kad-air.MacroHunt`.
+Open `MacroHunt.xcodeproj` in Xcode for development. iOS 26+ (deployment target 26.0 — Keith is the only user and runs the current release, so there is no reason to keep older targets alive); SwiftUI + SwiftData + Swift Charts; bundle id `com.kad-air.MacroHunt`.
 
-**Adding a source file:** the project is in the explicit-reference format (`objectVersion = 56`, no file-system-synchronized groups), so every `.swift` file is individually listed in `MacroHunt.xcodeproj/project.pbxproj`. A new file must be registered there (PBXBuildFile entry, PBXFileReference, group membership, and the Sources build phase) or it won't compile. Repurposing/renaming an already-referenced file avoids hand-editing the pbxproj.
+**Adding a source file:** the project is in the explicit-reference format (`objectVersion = 56`, no file-system-synchronized groups), so every `.swift` file is individually listed in `MacroHunt.xcodeproj/project.pbxproj`. A new file must be registered there (PBXBuildFile entry, PBXFileReference, group membership, and the Sources build phase) or it won't compile. Repurposing/renaming an already-referenced file avoids hand-editing the pbxproj. The UI-test target was added the same way by hand (object ids `0010000…0011`–`…0015`, configs `…0005`/`…0006`).
+
+### The iPhone Duo check (run it; it fails loudly)
+
+```bash
+scripts/duo-check.sh              # SKIP_TESTS=1 stops before the UI test
+```
+
+Proves, against the real toolchain and the *built* product, that the app is Duo-ready: an Xcode with an iOS Simulator SDK ≥ 27.1 (auto-detected under `/Applications/Xcode*.app`), an iOS ≥ 27.1 runtime and the iPhone Duo device type, a Release build whose built `Info.plist` links `iphonesimulator27.1+` with no `UIRequiresFullScreen` and both device families, the app alive 8 s after launch on a Duo simulator, every panel captured with at least one lit (under `/tmp/macrohunt-duo-check/`), then `MacroHuntUITests` on that simulator. It **reuses** an existing Duo simulator (a booted one first, then "MacroHunt iPhone Duo", then any Duo-typed device — e.g. Stow's) and only creates one as a last resort. The Duo boots *closed*: the default `simctl io … screenshot` is the dark inner panel; the cover is `--display=1`, the inner `--display=3`, and the pose is only switchable in Device Hub (ask). **Never `CODE_SIGNING_ALLOWED=NO` a build you will launch** — unsigned, the app has no HealthKit entitlement and alerts on launch; local automatic signing works. The recipe and gotchas: `~/Code/iphone-duo-playbook.md`.
 
 ## Architecture
 
@@ -63,4 +71,14 @@ Warm "Liquid Glass" design language (translucent materials, glass cards) over a 
 - **Surfaces/layout:** `WarmBackground` (aliased as `LiquidGlassBackground`), `GlassCard`, `.glassContainer()`, `MHHeader`, `SectionHeader`.
 - **Components:** `CalorieRing`, `MacroTrack`, `StatTile`, `StatusPill`, `SegmentedToggle`, `MealCard`, plus `PrimaryButtonStyle`/`GhostButtonStyle` and `.inputFieldStyle()`.
 
-`MainTabView` is **not** a system `TabView` — it's a custom shell hosting the four surfaces (Today/Calendar/Trends/Settings) with a floating glass tab bar (`MHTabBar`) whose center "+" opens the Add-meal sheet. Settings lives **only** in the tab bar (a plain `gearshape`), not duplicated in any header.
+`MainTabView` **is a system `TabView`** hosting the four surfaces (Today/Calendar/Trends/Settings); the Add-meal sheet is opened by the "Add meal" bar action on the Today/Calendar/Trends roots (`AddMealToolbarItem`) and Today's in-content "log next" row. It used to be a hand-drawn floating bar with a center "+" — that was replaced deliberately for the iPhone Duo (below); don't bring the custom bar back. Settings lives **only** in the tab bar (a plain `gearshape`), not duplicated in any header.
+
+### iPhone Duo (iOS 27.1) — bars are system bars
+
+The Duo lays the status bar, tab bar and toolbar items out as a **vertical strip on the trailing edge** of its cover display and of its open inner display — but only for standard items that carry **both a title and an SF Symbol** inside a system `TabView` / `NavigationStack` `.toolbar`. Hidden bars, hand-drawn bars/chips, `Image`-only labels and text-only items never get it. Hence the rules this codebase follows (HIG "Designing for iPhone Duo"):
+
+- **Tab roots keep their navigation bar visible** via `.tabRootBar("Today")` (`Utilities/DesignSystem.swift`): `.navigationTitle` + `.toolbarTitleDisplayMode(.inline)` + `.toolbar(removing: .title)`, so the in-content `MHHeader` masthead stays the visible title and the bar still exists to host items. Never reintroduce `.navigationBarHidden(true)` on a root. The Add action is `AddMealToolbarItem` (`Label("Add meal", systemImage: "plus")`, `.topBarTrailing`), attached to the root content outside any empty/loading branch.
+- **Sheets are `NavigationStack`s with semantic dismiss items**: `.confirmationAction` → `Button("Done", systemImage: "checkmark")`, `.cancellationAction` → `Button("Cancel", systemImage: "xmark")`. Don't hand-style bar items; the system draws them. **Every sheet's NavigationStack carries `.tint(Theme.accent)`** — a sheet is its own presentation root and does not inherit the TabView's tint (a prominent confirmation item renders system blue otherwise). Content-level buttons (Save meal, Re-analyze, Onboarding's Back/Next) stay where they are.
+- Layout is size-class-only (already true; nothing reads `userInterfaceIdiom`/`UIScreen`/orientation). Bare `ignoresSafeArea()` is only on backgrounds/scrims. Plist: all orientations, generated launch screen, `TARGETED_DEVICE_FAMILY = 1,2`, no `UIRequiresFullScreen` — `duo-check.sh` asserts the built plist.
+- **The proof** is `MacroHuntUITests/DuoBarsUITests.swift`: launches with `MACROHUNT_DEBUG_ANTHROPIC_KEY` (seeds a bogus key *only while nothing is stored*, never written to the keychain, so onboarding doesn't cover the tabs), finds the four tabs and the "Add meal" item on each root by label, and asserts a vertical trailing column on the Duo's cover / open inner display (device from `SIMULATOR_MODEL_IDENTIFIER == "iPhone19,4"`, pose from `activeScreen()` — the largest *lit* `XCUIScreen.screens` entry, because `XCUIScreen.main` is the Duo's dark cover display even when it's open, and **never** `app.frame`, which stays unrotated on the open inner display) or horizontal bars elsewhere. Each surface is attached to the `.xcresult` with `.keepAlways` (`xcrun xcresulttool export attachments`), which is how the Duo screenshots under `docs/duo/` were produced.
+- What decides how the app looks on the Duo is **the SDK it links**: 27.0 shows it inset from the status bar, 27.1 reaches the edge and lays bars out vertically. Xcode Cloud must build with **Xcode 27.1** (pick it in the workflow) for TestFlight to get the Duo layout.
