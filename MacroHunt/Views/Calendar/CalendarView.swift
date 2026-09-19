@@ -12,6 +12,9 @@ struct CalendarView: View {
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
 
+    /// Opens the Add-meal sheet (owned by `MainTabView`).
+    var onAddMeal: () -> Void = {}
+
     @State private var selectedDate = Date()
     @State private var currentMonth = Date()
     @State private var detailDate: Date?
@@ -28,7 +31,6 @@ struct CalendarView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         MHHeader(kicker: monthYearString(from: currentMonth), title: "Calendar")
-                            .padding(.top, 8)
                             .padding(.bottom, 18)
 
                         calendarCard
@@ -41,10 +43,11 @@ struct CalendarView: View {
                         daySummaryCard
                     }
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 110)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationBarHidden(true)
+            .tabRootBar("Calendar")
+            .toolbar { AddMealToolbarItem(action: onAddMeal) }
             .sheet(item: $detailDate) { date in
                 DayDetailSheet(date: date, meals: mealsForDate(date) ?? [])
                     .environmentObject(credentials)
@@ -185,8 +188,8 @@ struct CalendarView: View {
     private func macroSplit(_ letter: String, _ grams: Double, _ color: Color) -> some View {
         HStack(spacing: 7) {
             Circle().fill(color).frame(width: 7, height: 7)
-            Text("\(letter) ").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink2)
-            + Text("\(Int(grams))g").font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink)
+            // Interpolated Text instead of `+` (deprecated in iOS 26).
+            Text("\(Text("\(letter) ").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink2))\(Text("\(Int(grams))g").font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink))")
         }
     }
 

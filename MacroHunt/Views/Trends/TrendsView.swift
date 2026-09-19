@@ -384,6 +384,9 @@ struct TrendsView: View {
 
     @Query(sort: \Meal.date, order: .reverse) private var allMeals: [Meal]
 
+    /// Opens the Add-meal sheet (owned by `MainTabView`).
+    var onAddMeal: () -> Void = {}
+
     @StateObject private var health = HealthTrendsViewModel()
 
     @State private var selectedPeriod: TimePeriod = .week
@@ -466,11 +469,12 @@ struct TrendsView: View {
                                 .padding(.horizontal)
                         }
                     }
-                    .padding(.top)
-                    .padding(.bottom, 110)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationBarHidden(true)
+            .tabRootBar("Trends")
+            .toolbar { AddMealToolbarItem(action: onAddMeal) }
             .task(id: selectedPeriod) {
                 await health.load(days: selectedPeriod.days)
             }
@@ -942,12 +946,17 @@ struct HealthMetricDetailView: View {
             .navigationTitle(metric.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                // Semantic placement + title + symbol: the Duo moves this into its vertical
+                // bar on the cover display and centers it on the inner display.
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
             .task(id: range) { await load() }
         }
+        // A sheet is its own presentation root: it does not inherit the TabView's tint, and a
+        // prominent confirmation item renders system blue without this.
+        .tint(Theme.accent)
     }
 
     private var summaryCard: some View {

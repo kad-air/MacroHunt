@@ -214,6 +214,45 @@ struct MHHeader: View {
     }
 }
 
+// MARK: - Bars (iPhone Duo HIG)
+
+/// Tab-root bar treatment. The navigation bar stays VISIBLE — a hidden bar never gets the
+/// iPhone Duo's vertical layout and its items vanish — but the bar's own title is removed so
+/// the in-content `MHHeader` masthead stays the visible title. `title` still names the Back
+/// button of anything pushed from this root.
+struct TabRootBar: ViewModifier {
+    let title: String
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(title)
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar(removing: .title)
+    }
+}
+
+extension View {
+    func tabRootBar(_ title: String) -> some View {
+        modifier(TabRootBar(title: title))
+    }
+}
+
+/// The "log a meal" action as a standard trailing bar item — a `Label` with both a title and
+/// a symbol, which is the only kind of item the Duo lays out in its vertical bars. Attached
+/// to each tab root's NavigationStack content (outside any loading/empty branch) so it exists
+/// in every state; `DuoBarsUITests` looks it up by its "Add meal" label.
+struct AddMealToolbarItem: ToolbarContent {
+    let action: () -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: action) {
+                Label("Add meal", systemImage: "plus")
+            }
+        }
+    }
+}
+
 struct FlowLayout: Layout {
     var spacing: CGFloat
 

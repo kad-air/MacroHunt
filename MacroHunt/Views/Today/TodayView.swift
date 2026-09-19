@@ -8,7 +8,8 @@ struct TodayView: View {
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
 
-    /// Opens the Add-meal sheet (owned by `MainTabView`, shared with the center "+").
+    /// Opens the Add-meal sheet (owned by `MainTabView`); drives both the bar's "Add meal"
+    /// item and the in-content "log next" row.
     var onAddMeal: () -> Void = {}
 
     @StateObject private var reflection = ReflectionViewModel()
@@ -28,7 +29,6 @@ struct TodayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         header
-                            .padding(.top, 8)
                             .padding(.bottom, 18)
 
                         summaryCard
@@ -64,10 +64,11 @@ struct TodayView: View {
                             .padding(.top, 2)
                     }
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 110)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationBarHidden(true)
+            .tabRootBar("Today")
+            .toolbar { AddMealToolbarItem(action: onAddMeal) }
             .task(id: reflectionTaskKey) {
                 await reflection.ensureLoaded(mealCount: todayMeals.count, modelContext: modelContext, credentials: credentials)
             }
@@ -503,32 +504,44 @@ struct ReflectionSheet: View {
     private let observationColors: [Color] = [Theme.accent, Theme.protein, Theme.carbs, Theme.fat]
 
     var body: some View {
-        ZStack {
-            LiquidGlassBackground()
+        // NavigationStack + a semantic Done item (title + symbol) instead of a hand-drawn
+        // xmark chip, so the iPhone Duo can place it in its vertical bar — see AddMealView.
+        NavigationStack {
+            ZStack {
+                LiquidGlassBackground()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        header
 
-                    switch reflection.state {
-                    case .ready(let r):
-                        readyContent(r)
-                        footer
-                    case .loading:
-                        loadingState
-                        footer
-                    case .failed(let message):
-                        failedState(message)
-                        footer
-                    case .idle:
-                        EmptyView()
+                        switch reflection.state {
+                        case .ready(let r):
+                            readyContent(r)
+                            footer
+                        case .loading:
+                            loadingState
+                            footer
+                        case .failed(let message):
+                            failedState(message)
+                            footer
+                        case .idle:
+                            EmptyView()
+                        }
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 40)
+            }
+            .navigationTitle("Daily reflection")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar(removing: .title)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark") { dismiss() }
+                }
             }
         }
+        .tint(Theme.accent)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
@@ -625,16 +638,8 @@ struct ReflectionSheet: View {
                     .foregroundStyle(Theme.ink2)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Theme.ink2)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Theme.chip))
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.top, 12)
+        .padding(.top, 4)
     }
 
     private func ideaCard(_ text: String) -> some View {
