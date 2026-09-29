@@ -167,7 +167,17 @@ final class HealthKitService {
         }
 
         guard !objects.isEmpty else { return }
-        try await store.delete(objects)
+
+        // Delete the member samples (energy + macros) explicitly, then the correlation. Apple
+        // doesn't document that deleting a correlation also removes the samples it bundles, and
+        // a leftover dietary-energy sample would keep counting toward the day's totals in
+        // Health. Samples first: if HealthKit does cascade the other way, the correlation
+        // delete just finds nothing left to do.
+        let members = objects.compactMap { $0 as? HKCorrelation }.flatMap { Array($0.objects) }
+        if !members.isEmpty {
+            try await store.delete(members)
+        }
+        try? await store.delete(objects)
     }
 
     // MARK: - Read: Weight (Phase 2)

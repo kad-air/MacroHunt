@@ -7,11 +7,13 @@ enum APIError: LocalizedError {
     case httpError(statusCode: Int, body: String)
     case networkError(Error)
     case decodingError(String)
-    case noData
     case emptyResponse
     case rateLimited
     case serverError(Int)
-    case cancelled
+    /// The model (and any server-side fallback) declined; the associated text is user-facing.
+    case refused(String)
+    /// The response hit `max_tokens` before the answer finished.
+    case truncated
 
     var errorDescription: String? {
         switch self {
@@ -25,27 +27,16 @@ enum APIError: LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .decodingError(let detail):
             return "Failed to parse response: \(detail)"
-        case .noData:
-            return "No data received"
         case .emptyResponse:
             return "Empty response from server"
         case .rateLimited:
             return "Rate limited. Please try again later."
         case .serverError(let code):
             return "Server error (\(code)). Please try again."
-        case .cancelled:
-            return "Request was cancelled"
-        }
-    }
-
-    var isRetryable: Bool {
-        switch self {
-        case .rateLimited, .serverError:
-            return true
-        case .networkError(let error):
-            return (error as NSError).code != NSURLErrorCancelled
-        default:
-            return false
+        case .refused(let message):
+            return message
+        case .truncated:
+            return "Claude's answer was cut off before it finished. Please try again."
         }
     }
 }

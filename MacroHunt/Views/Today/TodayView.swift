@@ -1,9 +1,11 @@
 // Views/Today/TodayView.swift
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var credentials: CredentialsManager
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
@@ -16,9 +18,17 @@ struct TodayView: View {
     @State private var showReflection = false
     @State private var deleteError: String?
 
+    /// The moment "today" is computed from. Refreshed at midnight (significant-time-change,
+    /// which iOS queues for a suspended app and delivers on resume) and on returning to the
+    /// foreground. Reading `Date()` in `body` alone left the screen on yesterday's meals and
+    /// ring the next morning, because nothing re-rendered it.
+    @State private var now = Date()
+
     private var todayMeals: [Meal] {
-        let startOfToday = Calendar.current.startOfDay(for: Date())
-        return allMeals.filter { $0.date >= startOfToday }.sorted { $0.date < $1.date }
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday)!
+        return allMeals.filter { $0.date >= startOfToday && $0.date < startOfTomorrow }
     }
 
     var body: some View {
@@ -83,20 +93,26 @@ struct TodayView: View {
             } message: {
                 Text(deleteError ?? "Unknown error")
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                now = Date()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { now = Date() }
+            }
         }
     }
 
     /// Re-run the reflection check when the day rolls over, when reflections get toggled,
     /// or when the key is first added. Today's meal count nudges it to refresh after logging.
     private var reflectionTaskKey: String {
-        "\(Self.dayKey(Date()))-\(credentials.dailyReflectionEnabled)-\(credentials.anthropicKey.isEmpty)-\(todayMeals.count)"
+        "\(Self.dayKey(now))-\(credentials.dailyReflectionEnabled)-\(credentials.anthropicKey.isEmpty)-\(todayMeals.count)"
     }
 
     // MARK: - Header
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
+            Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.ink2)
             Text(greeting)
@@ -107,7 +123,7 @@ struct TodayView: View {
     }
 
     private var greeting: String {
-        switch Calendar.current.component(.hour, from: Date()) {
+        switch Calendar.current.component(.hour, from: now) {
         case 0..<12: return "Good morning"
         case 12..<17: return "Good afternoon"
         default: return "Good evening"
@@ -213,10 +229,16 @@ struct TodayView: View {
         }
     }
 
+    /// Evaluated on every render (via `reflectionTaskKey`), so the formatter is built once.
+    private static let dayKeyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     static func dayKey(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
+        dayKeyFormatter.string(from: date)
     }
 }
 
@@ -367,31 +389,49 @@ final class ReflectionViewModel: ObservableObject {
             state = .idle
             return
         }
-        await generate(force: false, mealCount: mealCount, modelContext: modelContext, credentials: credentials)
+        await generate(mealCount: mealCount, modelContext: modelContext, credentials: credentials)
     }
 
-    /// Generates a new reflection. `force` bypasses the "already loading" guard for the
-    /// Regenerate button. `mealCount` is the number of meals logged today that this reflection
-    /// will reflect, so the cache can be invalidated when it next changes.
-    func generate(force: Bool, mealCount: Int, modelContext: ModelContext, credentials: CredentialsManager) async {
+    /// Bumped by every `generate` call. A call that finishes after a newer one started drops
+    /// its result, so the latest request always wins.
+    private var generation = 0
+
+    /// Generates a new reflection, superseding any still in flight. `mealCount` is the number
+    /// of meals logged today that this reflection will reflect, so the cache can be invalidated
+    /// when it next changes.
+    ///
+    /// This used to bail out while another generation was `.loading`. But `.task(id:)` cancels
+    /// the old task when the meal count changes, so logging a meal mid-generation made the new
+    /// call bail, then the cancelled call landed and set `.failed("cancelled")` — the card sat
+    /// on "Reflection unavailable" until the next meal.
+    func generate(mealCount: Int, modelContext: ModelContext, credentials: CredentialsManager) async {
         guard !credentials.anthropicKey.isEmpty else {
             state = .idle
             return
         }
-        if case .loading = state, !force { return }
 
+        generation += 1
+        let thisGeneration = generation
         state = .loading
         let context = await buildContext(modelContext: modelContext, credentials: credentials)
         do {
             let client = ClaudeAPI(apiKey: credentials.anthropicKey)
             let result = try await client.generateReflection(context: context)
+            guard thisGeneration == generation else { return }
             let today = TodayView.dayKey(Date())
             loadedDay = today
             loadedMealCount = mealCount
             Self.writeCache(result, forDay: today, mealCount: mealCount)
             state = .ready(result)
         } catch {
-            state = .failed(friendly(error))
+            guard thisGeneration == generation else { return }
+            // Cancelled (Today went off screen, or its task was replaced) is not a failure:
+            // go back to idle and let the next `.task` run regenerate.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                state = .idle
+            } else {
+                state = .failed(friendly(error))
+            }
         }
     }
 
@@ -670,7 +710,7 @@ struct ReflectionSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
-                Task { await reflection.generate(force: true, mealCount: mealCount, modelContext: modelContext, credentials: credentials) }
+                Task { await reflection.generate(mealCount: mealCount, modelContext: modelContext, credentials: credentials) }
             } label: {
                 HStack(spacing: 6) {
                     if case .loading = reflection.state {

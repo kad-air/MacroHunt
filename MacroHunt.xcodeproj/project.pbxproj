@@ -27,6 +27,7 @@
 		001000001000000000000018 /* MealRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000018 /* MealRepository.swift */; };
 		001000001000000000000019 /* CredentialsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000019 /* CredentialsManager.swift */; };
 		001000001000000000000020 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000020 /* KeychainHelper.swift */; };
+		001000001000000000000030 /* ImageDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000030 /* ImageDownsampler.swift */; };
 		001000001000000000000021 /* NetworkConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000021 /* NetworkConfig.swift */; };
 		001000001000000000000022 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000022 /* APIError.swift */; };
 		001000001000000000000023 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 001000002000000000000023 /* DesignSystem.swift */; };
@@ -68,6 +69,7 @@
 		001000002000000000000018 /* MealRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealRepository.swift; sourceTree = "<group>"; };
 		001000002000000000000019 /* CredentialsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsManager.swift; sourceTree = "<group>"; };
 		001000002000000000000020 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		001000002000000000000030 /* ImageDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDownsampler.swift; sourceTree = "<group>"; };
 		001000002000000000000021 /* NetworkConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkConfig.swift; sourceTree = "<group>"; };
 		001000002000000000000022 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		001000002000000000000023 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				001000002000000000000019 /* CredentialsManager.swift */,
 				001000002000000000000020 /* KeychainHelper.swift */,
 				001000002000000000000021 /* NetworkConfig.swift */,
+				001000002000000000000030 /* ImageDownsampler.swift */,
 				001000002000000000000022 /* APIError.swift */,
 				001000002000000000000023 /* DesignSystem.swift */,
 			);
@@ -349,6 +352,7 @@
 				001000001000000000000019 /* CredentialsManager.swift in Sources */,
 				001000001000000000000020 /* KeychainHelper.swift in Sources */,
 				001000001000000000000021 /* NetworkConfig.swift in Sources */,
+				001000001000000000000030 /* ImageDownsampler.swift in Sources */,
 				001000001000000000000022 /* APIError.swift in Sources */,
 				001000001000000000000023 /* DesignSystem.swift in Sources */,
 				001000001000000000000025 /* APIConfigurationView.swift in Sources */,

@@ -69,14 +69,18 @@ struct SettingsView: View {
             .task {
                 weightUnit = await HealthKitService.shared.preferredWeightUnit()
                 if credentials.weightGoalKg > 0 {
-                    weightText = String(Int(weightUnit.fromKilograms(credentials.weightGoalKg).rounded()))
+                    weightText = weightUnit.fromKilograms(credentials.weightGoalKg)
+                        .formatted(.number.precision(.fractionLength(0...1)).grouping(.never))
                 }
                 currentWeightKg = await HealthKitService.shared.latestBodyMass()?.kilograms
             }
             .onChange(of: weightText) { _, newValue in
-                if let value = Double(newValue), value > 0 {
-                    credentials.weightGoalKg = weightUnit.toKilograms(value)
-                } else {
+                if let value = Double(newValue.replacingOccurrences(of: ",", with: ".")), value > 0 {
+                    // Only write on a real edit, so seeding the field never rounds the stored goal.
+                    // 0.025 kg clears the one-decimal display rounding (≤ 0.05 lb ≈ 0.023 kg).
+                    let kg = weightUnit.toKilograms(value)
+                    if abs(kg - credentials.weightGoalKg) > 0.025 { credentials.weightGoalKg = kg }
+                } else if credentials.weightGoalKg != 0 {
                     credentials.weightGoalKg = 0
                 }
             }
@@ -183,7 +187,7 @@ struct SettingsView: View {
                 Spacer()
                 Text("\(total)%")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(total == 100 ? Theme.good : .orange)
+                    .foregroundStyle(total == 100 ? Theme.good : Theme.warn)
                     .monospacedDigit()
             }
 
@@ -257,6 +261,13 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Version \(version) (\(build))"
     }
 
     private var weightGoalCaption: String? {
@@ -375,7 +386,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let healthMessage {
-                Text(healthMessage).font(.system(size: 11)).foregroundStyle(.orange)
+                Text(healthMessage).font(.system(size: 11)).foregroundStyle(Theme.warn)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -409,7 +420,7 @@ struct SettingsView: View {
     private var appInfo: some View {
         VStack(spacing: 3) {
             Text("MacroHunt").font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Theme.ink)
-            Text("Version 1.0").font(.system(size: 12)).foregroundStyle(Theme.ink3)
+            Text(versionString).font(.system(size: 12)).foregroundStyle(Theme.ink3)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 28)

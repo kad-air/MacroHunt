@@ -2,8 +2,9 @@
 import SwiftUI
 import SwiftData
 
-extension Date: @retroactive Identifiable {
-    public var id: TimeInterval { timeIntervalSince1970 }
+private struct DaySelection: Identifiable {
+    let date: Date
+    var id: Date { date }
 }
 
 struct CalendarView: View {
@@ -17,7 +18,7 @@ struct CalendarView: View {
 
     @State private var selectedDate = Date()
     @State private var currentMonth = Date()
-    @State private var detailDate: Date?
+    @State private var detailDay: DaySelection?
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
@@ -48,8 +49,8 @@ struct CalendarView: View {
             }
             .tabRootBar("Calendar")
             .toolbar { AddMealToolbarItem(action: onAddMeal) }
-            .sheet(item: $detailDate) { date in
-                DayDetailSheet(date: date, meals: mealsForDate(date) ?? [])
+            .sheet(item: $detailDay) { selection in
+                DayDetailSheet(date: selection.date)
                     .environmentObject(credentials)
             }
         }
@@ -58,7 +59,9 @@ struct CalendarView: View {
     // MARK: - Calendar card
 
     private var calendarCard: some View {
-        GlassCard {
+        // One pass over all meals per render, instead of a filter per day cell.
+        let stats = dayStats
+        return GlassCard {
             VStack(spacing: 14) {
                 HStack {
                     monthButton(systemName: "chevron.left", delta: -1)
@@ -84,15 +87,15 @@ struct CalendarView: View {
                         if let date {
                             DayCell(
                                 date: date,
-                                calories: caloriesForDate(date),
+                                calories: stats[calendar.startOfDay(for: date)]?.calories,
                                 goal: credentials.dailyCalorieGoal,
                                 isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                                 isToday: calendar.isDateInToday(date),
                                 isFuture: calendar.startOfDay(for: date) > calendar.startOfDay(for: Date())
                             ) {
                                 selectedDate = date
-                                if let meals = mealsForDate(date), !meals.isEmpty {
-                                    detailDate = date
+                                if (stats[calendar.startOfDay(for: date)]?.count ?? 0) > 0 {
+                                    detailDay = DaySelection(date: date)
                                 }
                             }
                         } else {
@@ -122,6 +125,7 @@ struct CalendarView: View {
     @ViewBuilder
     private var daySummaryCard: some View {
         let meals = mealsForDate(selectedDate) ?? []
+        let selectedStats = dayStats[calendar.startOfDay(for: selectedDate)]
         GlassCard {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
@@ -135,7 +139,7 @@ struct CalendarView: View {
                     }
                     Spacer()
                     if !meals.isEmpty {
-                        Button { detailDate = selectedDate } label: {
+                        Button { detailDay = DaySelection(date: selectedDate) } label: {
                             HStack(spacing: 5) {
                                 Text("Details").font(.system(size: 13, weight: .semibold))
                                 Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
@@ -152,7 +156,7 @@ struct CalendarView: View {
                         .foregroundStyle(Theme.ink3)
                         .padding(.top, 14)
                 } else {
-                    let total = meals.reduce(0) { $0 + $1.calories }
+                    let total = selectedStats?.calories ?? 0
                     let goal = credentials.dailyCalorieGoal
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
                         Text("\(total.formatted())")
@@ -226,22 +230,25 @@ struct CalendarView: View {
         return meals.isEmpty ? nil : meals
     }
 
-    /// Calories for a day, or `nil` when nothing was logged. `nil` (untracked) is rendered
-    /// differently from a tracked-but-light day — an untracked day isn't a low-calorie day.
-    private func caloriesForDate(_ date: Date) -> Int? {
-        mealsForDate(date).map { $0.reduce(0) { $0 + $1.calories } }
+    /// Calories and meal count per day (keyed by start of day), computed in one pass. A day with
+    /// nothing logged has no entry — `nil` (untracked) is rendered differently from a
+    /// tracked-but-light day, since an untracked day isn't a low-calorie day.
+    private var dayStats: [Date: (calories: Int, count: Int)] {
+        var result: [Date: (calories: Int, count: Int)] = [:]
+        for meal in allMeals {
+            let key = calendar.startOfDay(for: meal.date)
+            let existing = result[key] ?? (calories: 0, count: 0)
+            result[key] = (calories: existing.calories + meal.calories, count: existing.count + 1)
+        }
+        return result
     }
 
     private func monthYearString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: date)
+        date.formatted(.dateTime.month(.wide).year())
     }
 
     private func dayString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: date)
+        date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
     }
 }
 

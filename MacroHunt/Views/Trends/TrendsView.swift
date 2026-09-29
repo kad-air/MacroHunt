@@ -268,7 +268,6 @@ final class HealthTrendsViewModel: ObservableObject {
     /// trend is loaded on demand by the detail sheet via `series(for:days:intervalDays:)`.
     @Published var sparklines: [HealthMetricID: [Double]] = [:]
 
-    @Published var isLoading = false
     @Published var hasLoadedOnce = false
 
     /// Window for the inline tile sparklines (≈12 weeks of weekly buckets).
@@ -283,7 +282,6 @@ final class HealthTrendsViewModel: ObservableObject {
     func load(days: Int) async {
         let hk = HealthKitService.shared
         guard hk.isHealthDataAvailable else { hasLoadedOnce = true; return }
-        isLoading = true
 
         async let unitTask = hk.preferredWeightUnit()
         async let latestWeightTask = hk.latestBodyMass()
@@ -316,17 +314,22 @@ final class HealthTrendsViewModel: ObservableObject {
         for point in basal { expenditure[calendar.startOfDay(for: point.date), default: 0] += Int(point.value.rounded()) }
 
         let latestWeight = await latestWeightTask
+        let workouts = await workoutsTask
+        let resting = await restingTask
+        let hrvValue = await hrvTask
+        let vo2 = await vo2Task
+        let recovery = await recoveryTask
+        let sparkSteps = await sparkStepsTask
+        let sparkActive = await sparkActiveTask
+        let sparkWorkouts = await sparkWorkoutsTask
+        let sparkResting = await sparkRestingTask
+        let sparkHrv = await sparkHrvTask
+        let sparkVo2 = await sparkVo2Task
+        let sparkRecovery = await sparkRecoveryTask
 
-        weightUnit = unit
-        latestWeightKg = latestWeight?.kilograms
-        dailyExpenditure = expenditure
-        avgActiveEnergy = active.isEmpty ? 0 : active.map(\.value).reduce(0, +) / Double(active.count)
-        avgSteps = steps.isEmpty ? 0 : steps.map(\.value).reduce(0, +) / Double(steps.count)
-        workoutCount = await workoutsTask
-        restingHR = await restingTask
-        hrv = await hrvTask
-        vo2Max = await vo2Task
-        cardioRecovery = await recoveryTask
+        // HealthKit continuations don't observe cancellation, so a slow query for a stale
+        // period can finish after a newer one; drop it instead of overwriting fresh state.
+        if Task.isCancelled { return }
 
         // Drop the still-running current week from the cumulative-total sparklines so the tile
         // trend doesn't end on a misleading dip (same incomplete-week problem as the detail
@@ -335,17 +338,27 @@ final class HealthTrendsViewModel: ObservableObject {
             projectIncompleteBucket(series, intervalDays: 7, isCumulative: true).complete.map(\.value)
         }
 
+        weightUnit = unit
+        latestWeightKg = latestWeight?.kilograms
+        dailyExpenditure = expenditure
+        avgActiveEnergy = active.isEmpty ? 0 : active.map(\.value).reduce(0, +) / Double(active.count)
+        avgSteps = steps.isEmpty ? 0 : steps.map(\.value).reduce(0, +) / Double(steps.count)
+        workoutCount = workouts
+        restingHR = resting
+        hrv = hrvValue
+        vo2Max = vo2
+        cardioRecovery = recovery
+
         sparklines = [
-            .steps: completedCumulative(await sparkStepsTask),
-            .activeEnergy: completedCumulative(await sparkActiveTask),
-            .workouts: completedCumulative(await sparkWorkoutsTask),
-            .restingHR: (await sparkRestingTask).map(\.value),
-            .hrv: (await sparkHrvTask).map(\.value),
-            .vo2Max: (await sparkVo2Task).map(\.value),
-            .cardioRecovery: (await sparkRecoveryTask).map(\.value)
+            .steps: completedCumulative(sparkSteps),
+            .activeEnergy: completedCumulative(sparkActive),
+            .workouts: completedCumulative(sparkWorkouts),
+            .restingHR: sparkResting.map(\.value),
+            .hrv: sparkHrv.map(\.value),
+            .vo2Max: sparkVo2.map(\.value),
+            .cardioRecovery: sparkRecovery.map(\.value)
         ]
 
-        isLoading = false
         hasLoadedOnce = true
     }
 
@@ -358,8 +371,11 @@ final class HealthTrendsViewModel: ObservableObject {
         async let unitTask = hk.preferredWeightUnit()
         async let samplesTask = hk.bodyMassSeries(days: days)
         let unit = await unitTask
+        let samples = await samplesTask
+        // Stale range (task cancelled by a newer picker choice): don't overwrite the newer chart.
+        if Task.isCancelled { return }
         weightUnit = unit
-        weightSeries = (await samplesTask).map { (date: $0.date, value: unit.fromKilograms($0.kilograms)) }
+        weightSeries = samples.map { (date: $0.date, value: unit.fromKilograms($0.kilograms)) }
     }
 
     /// Long-term series for the tap-through detail sheet. Switches over the metric so the
@@ -563,7 +579,7 @@ struct TrendsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Calorie Trend", icon: "chart.line.uptrend.xyaxis")
 
-                CalorieTrendChart(data: trackedCalorieData, goal: credentials.dailyCalorieGoal)
+                CalorieTrendChart(data: trackedCalorieData, goal: credentials.dailyCalorieGoal, periodDays: selectedPeriod.days)
                     .frame(height: 200)
             }
         }
@@ -586,7 +602,7 @@ struct TrendsView: View {
                 } else {
                     Text("No macro data available")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
                 }
@@ -629,6 +645,9 @@ struct TrendsView: View {
             // Skip untracked days: pairing a nil/zero intake against real expenditure would
             // invent a full-day deficit on a day the user just didn't log.
             guard let intake = day.calories else { return nil }
+            // Exclude today: a partial day of eating against a full day's burn-so-far reads as a
+            // fake deficit (same "forgive the incomplete bucket" idea as projectIncompleteBucket).
+            guard !calendar.isDateInToday(day.date) else { return nil }
             let key = calendar.startOfDay(for: day.date)
             guard let expenditure = health.dailyExpenditure[key] else { return nil }
             return (date: day.date, intake: intake, expenditure: expenditure)
@@ -647,12 +666,12 @@ struct TrendsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Energy Balance", icon: "flame.fill")
 
-                EnergyBalanceChart(data: energyBalanceData)
+                EnergyBalanceChart(data: energyBalanceData, periodDays: selectedPeriod.days)
 
                 if let net = avgEnergyBalance {
                     Text(energyBalanceSummary(net: net))
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
             }
         }
@@ -680,7 +699,7 @@ struct TrendsView: View {
                             value: "\(Int(health.weightUnit.fromKilograms(kg).rounded()))",
                             unit: health.weightUnit.abbreviation,
                             caption: nil,
-                            color: .purple
+                            color: Theme.fat
                         )
                     }
                     if let goal = weightGoalDisplay {
@@ -689,7 +708,7 @@ struct TrendsView: View {
                             value: "\(Int(goal.rounded()))",
                             unit: health.weightUnit.abbreviation,
                             caption: credentials.weightGoalDirection.displayName,
-                            color: .blue
+                            color: Theme.carbs
                         )
                     }
                 }
@@ -711,7 +730,7 @@ struct TrendsView: View {
                 } else {
                     Text("No weigh-ins in this range. Record your weight in the Health app to see your trend here.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                         .padding(.vertical, 8)
                 }
             }
@@ -805,14 +824,14 @@ struct TrendsView: View {
 
                 Text("Connect Apple Health to see your weight, activity, and cardio trends alongside what you eat.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
 
                 Button {
                     connectHealth()
                 } label: {
                     HStack {
                         if isConnecting {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(Theme.onAccent)
                         } else {
                             Image(systemName: "heart.fill")
                         }
@@ -828,7 +847,7 @@ struct TrendsView: View {
                 if let connectMessage {
                     Text(connectMessage)
                         .font(.caption2)
-                        .foregroundColor(.orange)
+                        .foregroundStyle(Theme.warn)
                 }
             }
         }
@@ -854,15 +873,15 @@ struct TrendsView: View {
         VStack(spacing: 16) {
             Image(systemName: "chart.bar.xaxis")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundStyle(Theme.ink3)
 
             Text("No data yet")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.ink2)
 
             Text("Start logging meals to see your trends")
                 .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.8))
+                .foregroundStyle(Theme.ink3)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -912,7 +931,7 @@ struct HealthMetricDetailView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(metric.bucketSubtitle)
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(Theme.ink2)
 
                                 if displaySeries.count >= 2 {
                                     MetricTrendChart(data: displaySeries, color: metric.color, projection: projection.projected)
@@ -924,7 +943,7 @@ struct HealthMetricDetailView: View {
                                 } else {
                                     Text("Not enough data in this range yet.")
                                         .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(Theme.ink2)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 50)
                                 }
@@ -991,7 +1010,7 @@ struct HealthMetricDetailView: View {
 
                 Text(metric.definition)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 6) {
@@ -1011,7 +1030,10 @@ struct HealthMetricDetailView: View {
 
     private func load() async {
         isLoading = true
-        series = await health.series(for: metric, days: range.days, intervalDays: range.intervalDays)
+        let result = await health.series(for: metric, days: range.days, intervalDays: range.intervalDays)
+        // Stale (cancelled) range: don't overwrite the newer one's data or loading state.
+        if Task.isCancelled { return }
+        series = result
         isLoading = false
     }
 }

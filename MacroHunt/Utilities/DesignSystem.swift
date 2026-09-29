@@ -3,7 +3,7 @@
 //
 // A single warm palette that adapts to light/dark (the app follows the system
 // appearance). Colors, glass surfaces, the calorie ring, macro tracks, meal rows,
-// stat tiles and the custom tab bar all live here so the screens stay declarative.
+// stat tiles all live here so the screens stay declarative.
 
 import SwiftUI
 import UIKit
@@ -55,6 +55,7 @@ enum Theme {
     static let carbs   = Color(light: UIColor(rgb: 0x3E84C6), dark: UIColor(rgb: 0x5AA0DE))
     static let fat     = Color(light: UIColor(rgb: 0xD99A2B), dark: UIColor(rgb: 0xE9B85A))
     static let good    = Color(light: UIColor(rgb: 0x3DA866), dark: UIColor(rgb: 0x63C089))
+    static let warn    = Color(light: UIColor(rgb: 0xC7641E), dark: UIColor(rgb: 0xF0994A))
 
     // Surfaces
     static let chip        = Color(light: UIColor(rgb: 0x14100C, alpha: 0.05), dark: UIColor(white: 1, alpha: 0.07))
@@ -253,47 +254,6 @@ struct AddMealToolbarItem: ToolbarContent {
     }
 }
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat
-
-    init(spacing: CGFloat = 8) { self.spacing = spacing }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrangeSubviews(proposal: proposal, subviews: subviews).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
-        for (index, frame) in result.frames.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
-        let maxWidth = proposal.width ?? .infinity
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var frames: [CGRect] = []
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + spacing
-                lineHeight = 0
-            }
-            frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-            lineHeight = max(lineHeight, size.height)
-            currentX += size.width + spacing
-        }
-        return (CGSize(width: maxWidth, height: currentY + lineHeight), frames)
-    }
-}
-
 // MARK: - Button styles
 
 struct PrimaryButtonStyle: ButtonStyle {
@@ -325,22 +285,6 @@ struct GhostButtonStyle: ButtonStyle {
             )
             .opacity(configuration.isPressed ? 0.85 : 1.0)
     }
-}
-
-struct LiquidGlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .glassContainer(cornerRadius: 16)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-    }
-}
-
-extension ButtonStyle where Self == LiquidGlassButtonStyle {
-    static var liquidGlass: LiquidGlassButtonStyle { LiquidGlassButtonStyle() }
 }
 
 // MARK: - Input field
@@ -536,39 +480,5 @@ struct StatTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(15)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.chip))
-    }
-}
-
-// MARK: - Macro ring (legacy small ring, retained for compatibility)
-
-struct MacroRingView: View {
-    let value: Double
-    let goal: Double
-    let color: Color
-    let label: String
-    let unit: String
-
-    private var progress: Double {
-        guard goal > 0 else { return 0 }
-        return min(value / goal, 1.0)
-    }
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle().stroke(color.opacity(0.2), lineWidth: 8)
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                VStack(spacing: 0) {
-                    Text("\(Int(value))")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                    Text(unit).font(.system(size: 10)).foregroundStyle(Theme.ink2)
-                }
-            }
-            .frame(width: 60, height: 60)
-            Text(label).font(.caption).foregroundStyle(Theme.ink2)
-        }
     }
 }

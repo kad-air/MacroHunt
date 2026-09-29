@@ -42,14 +42,35 @@ struct CameraView: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Downsampling at ingest
+
+extension UIImage {
+    /// This image capped at `maxPixel` on its long edge, upright. A 12–48 MP photo held as a
+    /// `UIImage` is a 48–190 MB bitmap; five of them in the Add sheet was a real memory spike.
+    func downsampled(maxPixel: Int) -> UIImage {
+        guard let data = jpegData(compressionQuality: 0.9),
+              let image = ImageDownsampler.cgImage(from: data, maxPixel: maxPixel) else { return self }
+        return UIImage(cgImage: image)
+    }
+
+    /// Object identity, for `ForEach` (the same photo picked twice must still be two rows).
+    var identity: ObjectIdentifier { ObjectIdentifier(self) }
+}
+
 // MARK: - Photo Capture View
 
 struct PhotoCaptureView: View {
+    /// The analyze prompt and the empty-state copy both promise "up to 5 photos".
+    static let maxPhotos = 5
+
     @Binding var selectedPhotos: [UIImage]
     @State private var showingCamera = false
-    @State private var showingPhotoPicker = false
     @State private var capturedImage: UIImage?
     @State private var photoPickerItems: [PhotosPickerItem] = []
+
+    private var remainingSlots: Int { max(Self.maxPhotos - selectedPhotos.count, 0) }
+    /// No camera on the simulator (and some iPads); presenting the camera picker there crashes.
+    private let cameraAvailable = UIImagePickerController.isSourceTypeAvailable(.camera)
 
     var body: some View {
         VStack(spacing: 10) {
@@ -77,16 +98,19 @@ struct PhotoCaptureView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(selectedPhotos.indices, id: \.self) { index in
+                        // Identity is the image object, not its index: an index-keyed row
+                        // whose remove button captured a stale index could remove the wrong
+                        // photo (or trap out of range) on a quick double tap.
+                        ForEach(selectedPhotos, id: \.identity) { photo in
                             ZStack(alignment: .topTrailing) {
-                                Image(uiImage: selectedPhotos[index])
+                                Image(uiImage: photo)
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 100, height: 100)
                                     .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                                 Button {
-                                    withAnimation { _ = selectedPhotos.remove(at: index) }
+                                    withAnimation { selectedPhotos.removeAll { $0 === photo } }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
                                         .font(.title3)
@@ -101,19 +125,23 @@ struct PhotoCaptureView: View {
                 .frame(height: 110)
             }
 
-            // Take photo / Choose photo
-            HStack(spacing: 8) {
-                Button {
-                    showingCamera = true
-                } label: {
-                    photoActionLabel(icon: "camera", title: "Take photo")
-                }
-                .buttonStyle(.plain)
+            // Take photo / Choose photo — hidden once the photo limit is reached.
+            if remainingSlots > 0 {
+                HStack(spacing: 8) {
+                    if cameraAvailable {
+                        Button {
+                            showingCamera = true
+                        } label: {
+                            photoActionLabel(icon: "camera", title: "Take photo")
+                        }
+                        .buttonStyle(.plain)
+                    }
 
-                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 5, matching: .images) {
-                    photoActionLabel(icon: "photo.on.rectangle", title: "Choose photo")
+                    PhotosPicker(selection: $photoPickerItems, maxSelectionCount: remainingSlots, matching: .images) {
+                        photoActionLabel(icon: "photo.on.rectangle", title: "Choose photo")
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
         .fullScreenCover(isPresented: $showingCamera) {
@@ -122,23 +150,27 @@ struct PhotoCaptureView: View {
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
-                selectedPhotos.append(image)
+                if remainingSlots > 0 {
+                    selectedPhotos.append(image.downsampled(maxPixel: ImageDownsampler.storageMaxPixel))
+                }
                 capturedImage = nil
             }
         }
         .onChange(of: photoPickerItems) { _, items in
+            guard !items.isEmpty else { return }
             Task<Void, Never> {
                 for item in items {
+                    // Downsample straight from the encoded data, so the full-size bitmap is
+                    // never decoded — and off the main actor, since a 48 MP HEIC takes a moment.
                     if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        await MainActor.run {
-                            selectedPhotos.append(image)
-                        }
+                       let image = await Task.detached(priority: .userInitiated, operation: {
+                           ImageDownsampler.cgImage(from: data, maxPixel: ImageDownsampler.storageMaxPixel)
+                       }).value,
+                       selectedPhotos.count < Self.maxPhotos {
+                        selectedPhotos.append(UIImage(cgImage: image))
                     }
                 }
-                await MainActor.run {
-                    photoPickerItems = []
-                }
+                photoPickerItems = []
             }
         }
     }
