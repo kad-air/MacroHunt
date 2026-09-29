@@ -4,10 +4,24 @@ import SwiftData
 
 struct DayDetailSheet: View {
     let date: Date
-    let meals: [Meal]
+
+    /// Live query for just this day, so deletes made from the sheet update it immediately.
+    @Query private var meals: [Meal]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var credentials: CredentialsManager
+    @State private var deleteError: String?
+
+    init(date: Date) {
+        self.date = date
+        let start = Calendar.current.startOfDay(for: date)
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        _meals = Query(
+            filter: #Predicate<Meal> { $0.date >= start && $0.date < end },
+            sort: \Meal.date
+        )
+    }
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -49,6 +63,14 @@ struct DayDetailSheet: View {
         }
         // A sheet is its own presentation root and does not inherit the TabView's tint.
         .tint(Theme.accent)
+        .alert("Delete Failed", isPresented: Binding(
+            get: { deleteError != nil },
+            set: { if !$0 { deleteError = nil } }
+        )) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            Text(deleteError ?? "Unknown error")
+        }
     }
 
     // MARK: - Summary Section
@@ -67,18 +89,18 @@ struct DayDetailSheet: View {
                     VStack(alignment: .leading) {
                         Text("\(totalCalories)")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
-                            .foregroundColor(calorieColor(totalCalories, goal: goal))
+                            .foregroundStyle(calorieColor(totalCalories, goal: goal))
                         Text("of \(goal) kcal goal")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                     Spacer()
                     Text("\(meals.count)")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     Text(meals.count == 1 ? "meal" : "meals")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
 
                 Divider()
@@ -103,6 +125,13 @@ struct DayDetailSheet: View {
             VStack(spacing: 12) {
                 ForEach(meals) { meal in
                     MealCard(meal: meal)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                delete(meal)
+                            } label: {
+                                Label("Delete meal", systemImage: "trash")
+                            }
+                        }
                 }
             }
         }
@@ -114,17 +143,28 @@ struct DayDetailSheet: View {
         VStack(spacing: 12) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 40))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundStyle(Theme.ink3)
 
             Text("No meals logged this day")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.ink2)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
     }
 
     // MARK: - Helpers
+
+    private func delete(_ meal: Meal) {
+        Task {
+            do {
+                let repository = MealRepository(modelContext: modelContext, credentials: credentials)
+                try await repository.deleteMealWithSync(meal)
+            } catch {
+                deleteError = error.localizedDescription
+            }
+        }
+    }
 
     private func calorieColor(_ calories: Int, goal: Int) -> Color {
         guard goal > 0 else { return Theme.ink }
@@ -157,16 +197,17 @@ private struct MacroStat: View {
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                 Text(unit)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(Theme.ink2)
         }
     }
 }
 
 #Preview {
-    DayDetailSheet(date: Date(), meals: [])
+    DayDetailSheet(date: Date())
         .environmentObject(CredentialsManager())
+        .modelContainer(for: Meal.self, inMemory: true)
 }

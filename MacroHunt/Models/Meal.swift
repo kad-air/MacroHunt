@@ -21,12 +21,14 @@ enum MealType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var color: String {
-        switch self {
-        case .breakfast: return "orange"
-        case .lunch: return "yellow"
-        case .dinner: return "purple"
-        case .snack: return "green"
+    /// A sensible default for a meal logged at `date`, so the Add sheet doesn't always open
+    /// on Lunch.
+    static func suggested(for date: Date, calendar: Calendar = .current) -> MealType {
+        switch calendar.component(.hour, from: date) {
+        case 4..<11: return .breakfast
+        case 11..<15: return .lunch
+        case 17..<22: return .dinner
+        default: return .snack
         }
     }
 }

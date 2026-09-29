@@ -108,10 +108,16 @@ class CredentialsManager: ObservableObject {
 
     @Published private(set) var lastKeychainError: Bool = false
 
+    // Keys, tokens and ids are trimmed as they're entered: a pasted value often carries a
+    // trailing newline or space, which the services reject (a 401 for the Anthropic key) and
+    // which would make a blank-looking field count as "configured".
+
     @Published var craftToken: String {
         didSet {
             guard !isInitializing else { return }
-            let success = keychain.save(craftToken, service: service, account: "craftToken")
+            let trimmed = craftToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != craftToken { craftToken = trimmed }
+            let success = keychain.save(trimmed, service: service, account: "craftToken")
             lastKeychainError = !success
         }
     }
@@ -119,14 +125,18 @@ class CredentialsManager: ObservableObject {
     @Published var spaceId: String {
         didSet {
             guard !isInitializing else { return }
-            defaults?.set(spaceId, forKey: "spaceId")
+            let trimmed = spaceId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != spaceId { spaceId = trimmed }
+            defaults?.set(trimmed, forKey: "spaceId")
         }
     }
 
     @Published var anthropicKey: String {
         didSet {
             guard !isInitializing else { return }
-            let success = keychain.save(anthropicKey, service: service, account: "anthropicKey")
+            let trimmed = anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != anthropicKey { anthropicKey = trimmed }
+            let success = keychain.save(trimmed, service: service, account: "anthropicKey")
             lastKeychainError = !success
         }
     }
@@ -134,7 +144,9 @@ class CredentialsManager: ObservableObject {
     @Published var collectionId: String {
         didSet {
             guard !isInitializing else { return }
-            defaults?.set(collectionId, forKey: "collectionId")
+            let trimmed = collectionId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != collectionId { collectionId = trimmed }
+            defaults?.set(trimmed, forKey: "collectionId")
         }
     }
 
@@ -254,8 +266,11 @@ class CredentialsManager: ObservableObject {
         return Int(calories / 9.0) // 9 cal per gram of fat
     }
 
-    init() {
-        let defaults = UserDefaults(suiteName: Self.suiteName)
+    static let defaultCalorieGoal = 2000
+
+    /// `defaults` is the app-group suite; `scripts/core-check.sh` passes a throwaway suite to
+    /// exercise a fresh install.
+    init(defaults: UserDefaults? = UserDefaults(suiteName: CredentialsManager.suiteName)) {
         self.defaults = defaults
         self.isAppGroupAvailable = defaults != nil
 
@@ -272,7 +287,9 @@ class CredentialsManager: ObservableObject {
             ? (ProcessInfo.processInfo.environment["MACROHUNT_DEBUG_ANTHROPIC_KEY"] ?? "")
             : storedAnthropicKey
         self.collectionId = defaults?.string(forKey: "collectionId") ?? ""
-        self.dailyCalorieGoal = defaults?.integer(forKey: "dailyCalorieGoal") ?? 2000
+        // object(forKey:), not integer(forKey:): integer returns 0 for a missing key, which
+        // gave every fresh install a 0 kcal goal (onboarding never sets one).
+        self.dailyCalorieGoal = defaults?.object(forKey: "dailyCalorieGoal") as? Int ?? Self.defaultCalorieGoal
 
         // Load macro split (default to balanced)
         if let splitRaw = defaults?.string(forKey: "macroSplit"),

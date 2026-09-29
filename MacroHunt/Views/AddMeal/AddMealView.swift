@@ -7,13 +7,15 @@ struct AddMealView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var credentials: CredentialsManager
 
+    /// Already capped at `ImageDownsampler.storageMaxPixel` by `PhotoCaptureView`.
     @State private var selectedPhotos: [UIImage] = []
-    @State private var mealType: MealType = .lunch
+    @State private var mealType: MealType = .suggested(for: Date())
     @State private var mealDate: Date = Date()
     @State private var description: String = ""
     @State private var notes: String = ""
 
     @State private var isAnalyzing = false
+    @State private var analysisTask: Task<Void, Never>?
     @State private var analysisResult: NutritionAnalysis?
     @State private var errorMessage: String?
     @State private var showingReview = false
@@ -53,11 +55,17 @@ struct AddMealView: View {
                         .disabled(isSaving)
                 }
             }
-            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            .alert("Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
                 Button("OK") { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "")
             }
+            // Cancel (or a swipe-down) mid-analysis stops the request instead of letting it
+            // finish, and bill, into a dismissed sheet.
+            .onDisappear { analysisTask?.cancel() }
         }
         // A sheet is its own presentation root and does not inherit the TabView's tint.
         .tint(Theme.accent)
@@ -227,21 +235,23 @@ struct AddMealView: View {
         }
 
         isAnalyzing = true
-        Task {
+        analysisTask = Task {
             do {
-                let imageData = selectedPhotos.compactMap { $0.jpegData(compressionQuality: 0.7) }
+                // Downsample to the size the API works at: a full-resolution photo can pass the
+                // API's 5 MB per-image limit (a 400) and makes a slow upload the user waits on.
+                let imageData = selectedPhotos.compactMap { photo in
+                    photo.jpegData(compressionQuality: 0.9).flatMap(ImageDownsampler.analysisJPEG(from:))
+                }
                 let claude = ClaudeAPI(apiKey: credentials.anthropicKey)
                 let result = try await claude.analyzeMealPhotos(images: imageData, description: description, mealType: mealType)
-                await MainActor.run {
-                    analysisResult = result
-                    showingReview = true
-                    isAnalyzing = false
-                }
+                analysisResult = result
+                showingReview = true
+                isAnalyzing = false
             } catch {
-                await MainActor.run {
+                if !Task.isCancelled {
                     errorMessage = error.localizedDescription
-                    isAnalyzing = false
                 }
+                isAnalyzing = false
             }
         }
     }

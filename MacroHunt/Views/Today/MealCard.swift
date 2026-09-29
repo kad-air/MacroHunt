@@ -47,7 +47,7 @@ struct MealCard: View {
 
     private var thumbnail: some View {
         Group {
-            if let firstPhotoData = meal.photoData.first, let uiImage = UIImage(data: firstPhotoData) {
+            if let uiImage = MealThumbnailCache.thumbnail(for: meal) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
@@ -71,6 +71,26 @@ struct MealCard: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.ink2)
         }
+    }
+}
+
+/// Small decoded thumbnails for meal rows, keyed by meal id. The row used to decode the full
+/// stored photo (a 12 MP JPEG on older meals) for a 54-pt square on every render. Meal photos
+/// never change after logging, so there's nothing to invalidate.
+@MainActor
+enum MealThumbnailCache {
+    private static let cache = NSCache<NSString, UIImage>()
+    /// 54 pt at 3×.
+    private static let maxPixel = 162
+
+    static func thumbnail(for meal: Meal) -> UIImage? {
+        let key = meal.id.uuidString as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let data = meal.photoData.first,
+              let image = ImageDownsampler.cgImage(from: data, maxPixel: maxPixel) else { return nil }
+        let thumbnail = UIImage(cgImage: image)
+        cache.setObject(thumbnail, forKey: key)
+        return thumbnail
     }
 }
 

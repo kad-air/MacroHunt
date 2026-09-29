@@ -72,12 +72,22 @@ struct ReviewMealView: View {
     private func updateAnalysis() {
         analysis = NutritionAnalysis(
             mealName: editedName,
-            calories: Int(editedCalories) ?? analysis.calories,
-            protein: Double(editedProtein) ?? analysis.protein,
-            carbs: Double(editedCarbs) ?? analysis.carbs,
-            fat: Double(editedFat) ?? analysis.fat,
+            calories: parse(editedCalories).map { Int($0.rounded()) } ?? analysis.calories,
+            protein: parse(editedProtein) ?? analysis.protein,
+            carbs: parse(editedCarbs) ?? analysis.carbs,
+            fat: parse(editedFat) ?? analysis.fat,
             keyNutrients: editedNutrients
         )
+    }
+
+    /// A field's value: blank means 0 (clearing a field used to leave the last digit you
+    /// deleted, so "450" → "" saved 4), a decimal-pad comma is accepted, and calories take a
+    /// decimal like the macros do. `nil` (keep the previous value) only for unparseable text.
+    private func parse(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return 0 }
+        guard let value = Double(trimmed.replacingOccurrences(of: ",", with: ".")), value >= 0 else { return nil }
+        return value
     }
 }
 

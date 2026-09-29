@@ -38,7 +38,12 @@ BUNDLE_ID="${DUO_BUNDLE_ID:-com.kad-air.MacroHunt}"
 # only when there is none is "<Scheme> iPhone Duo" created.
 SIM_NAME="${DUO_SIM_NAME:-}"
 MIN_SDK="27.1"
-OUT_DIR="${DUO_CHECK_OUT:-/tmp/macrohunt-duo-check}"
+# Build output is several GB: keep it on the iOS-Dev volume, not the nearly-full internal SSD.
+if [ -d /Volumes/iOS-Dev/DerivedData ]; then
+  OUT_DIR="${DUO_CHECK_OUT:-/Volumes/iOS-Dev/DerivedData/macrohunt-duo-check}"
+else
+  OUT_DIR="${DUO_CHECK_OUT:-/tmp/macrohunt-duo-check}"
+fi
 DD="$OUT_DIR/DerivedData"
 
 fail() { printf '\nFAIL: %s\n' "$*" >&2; exit 1; }

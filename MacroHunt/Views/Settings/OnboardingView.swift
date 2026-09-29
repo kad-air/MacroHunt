@@ -88,7 +88,7 @@ struct OnboardingView: View {
             VStack(spacing: 24) {
                 Image(systemName: "fork.knife.circle.fill")
                     .font(.system(size: 80))
-                    .foregroundStyle(.orange, .orange.opacity(0.3))
+                    .foregroundStyle(Theme.accent, Theme.accentSoft)
                     .padding(.top, 40)
 
                 Text("Welcome to MacroHunt")
@@ -96,14 +96,14 @@ struct OnboardingView: View {
 
                 Text("Track your meals with AI-powered nutritional analysis.")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    FeatureRow(icon: "camera.fill", color: .blue, title: "Photo Analysis", description: "Snap photos of your meals for instant macro estimates")
-                    FeatureRow(icon: "chart.line.uptrend.xyaxis", color: .green, title: "Track Trends", description: "Monitor your nutrition over time with charts")
-                    FeatureRow(icon: "heart.fill", color: .red, title: "Apple Health", description: "Optionally sync meals and read your weight & activity")
+                    FeatureRow(icon: "camera.fill", color: Theme.carbs, title: "Photo Analysis", description: "Snap photos of your meals for instant macro estimates")
+                    FeatureRow(icon: "chart.line.uptrend.xyaxis", color: Theme.accent, title: "Track Trends", description: "Monitor your nutrition over time with charts")
+                    FeatureRow(icon: "heart.fill", color: Theme.protein, title: "Apple Health", description: "Optionally sync meals and read your weight & activity")
                 }
                 .padding()
             }
@@ -116,7 +116,7 @@ struct OnboardingView: View {
             VStack(spacing: 24) {
                 Image(systemName: "heart.fill")
                     .font(.system(size: 80))
-                    .foregroundStyle(.red, .red.opacity(0.3))
+                    .foregroundStyle(Theme.protein, Theme.protein.opacity(0.3))
                     .padding(.top, 40)
 
                 Text("Apple Health")
@@ -124,7 +124,7 @@ struct OnboardingView: View {
 
                 Text("MacroHunt can save the meals you log to Apple Health, and read your weight, activity, and heart data back in — so your Trends show what you eat alongside how you move. You choose exactly what to share on the next screen.")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
@@ -135,21 +135,21 @@ struct OnboardingView: View {
                             if healthKitSyncing {
                                 VStack(spacing: 8) {
                                     ProgressView(value: Double(healthKitSyncCurrent), total: Double(max(healthKitSyncTotal, 1)))
-                                        .tint(.red)
+                                        .tint(Theme.protein)
                                         .padding(.horizontal)
                                     Text("Syncing past meals… \(healthKitSyncCurrent) of \(healthKitSyncTotal)")
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(Theme.ink2)
                                 }
                             } else {
                                 HStack(spacing: 10) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                        .foregroundStyle(Theme.good)
                                     Text(healthKitSyncComplete && healthKitSyncedCount > 0
                                         ? "\(healthKitSyncedCount) past meal\(healthKitSyncedCount == 1 ? "" : "s") synced to Apple Health"
                                         : "Apple Health connected")
                                         .font(.subheadline)
-                                        .foregroundColor(.green)
+                                        .foregroundStyle(Theme.good)
                                 }
                             }
                         }
@@ -162,7 +162,7 @@ struct OnboardingView: View {
                             HStack {
                                 if healthKitRequesting {
                                     ProgressView()
-                                        .tint(.white)
+                                        .tint(Theme.onAccent)
                                 } else {
                                     Image(systemName: "heart.fill")
                                 }
@@ -172,19 +172,19 @@ struct OnboardingView: View {
                             .padding()
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.red)
+                        .tint(Theme.protein)
                         .disabled(healthKitRequesting)
                         .padding(.horizontal)
                     }
                 } else {
                     Text("Apple Health isn't available on this device.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
 
                 Text("You can change this any time in Settings.")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             .padding()
         }
@@ -231,7 +231,7 @@ struct OnboardingView: View {
             VStack(spacing: 24) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 60))
-                    .foregroundColor(.purple)
+                    .foregroundStyle(Theme.accent)
                     .padding(.top, 40)
 
                 Text("Enable AI Analysis")
@@ -239,7 +239,7 @@ struct OnboardingView: View {
 
                 Text("Add your Claude API key for nutritional analysis.")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .multilineTextAlignment(.center)
 
                 GlassCard {
@@ -247,14 +247,14 @@ struct OnboardingView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Anthropic API Key")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(Theme.ink2)
                             SecureField("Enter your API key", text: $credentials.anthropicKey)
                                 .inputFieldStyle()
                         }
 
                         Text("Get your API key from the Anthropic Console")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                 }
                 .padding(.horizontal)
@@ -263,7 +263,7 @@ struct OnboardingView: View {
                 if credentials.isAIConfigured {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundStyle(Theme.good)
                         Text("All set! You're ready to start tracking.")
                             .font(.subheadline)
                     }
@@ -295,7 +295,7 @@ private struct FeatureRow: View {
                     .font(.headline)
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
         }
     }

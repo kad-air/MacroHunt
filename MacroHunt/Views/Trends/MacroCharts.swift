@@ -28,15 +28,33 @@ func chartSpansMultipleYears(_ dates: [Date]) -> Bool {
     return last.timeIntervalSince(first) > 400 * 24 * 60 * 60
 }
 
+/// The full x-axis span for a period: start of the first day through the end of today.
+private func periodDomain(days: Int) -> ClosedRange<Date> {
+    let cal = Calendar.current
+    let startOfToday = cal.startOfDay(for: Date())
+    let start = cal.date(byAdding: .day, value: -(days - 1), to: startOfToday) ?? startOfToday
+    let end = cal.date(byAdding: .day, value: 1, to: startOfToday) ?? Date()
+    return start...end
+}
+
+/// The start of each day in the period — the week view's axis values. Striding by day over
+/// `periodDomain` would also label its end (the start of tomorrow), an eighth weekday.
+private func periodDayStarts(days: Int) -> [Date] {
+    let cal = Calendar.current
+    let startOfToday = cal.startOfDay(for: Date())
+    return (0..<days).reversed().compactMap { cal.date(byAdding: .day, value: -$0, to: startOfToday) }
+}
+
 // MARK: - Calorie Trend Chart
 
 struct CalorieTrendChart: View {
     let data: [(date: Date, calories: Int)]
     let goal: Int
+    /// Length of the period being shown (7 = week, 30 = month). `data` only holds tracked days,
+    /// so the period can't be inferred from its count.
+    let periodDays: Int
 
-    private var isWeekView: Bool {
-        data.count <= 7
-    }
+    private var isWeekView: Bool { periodDays <= 7 }
 
     /// Show the smoothing line only once there's enough history for it to mean something —
     /// below this a "trend" over 2–3 points is just the raw line with a lag.
@@ -112,9 +130,10 @@ struct CalorieTrendChart: View {
                 }
             }
             .chartYScale(domain: 0...(max(goal, (data.map(\.calories).max() ?? 0)) + 500))
+            .chartXScale(domain: periodDomain(days: periodDays))
             .chartXAxis {
                 if isWeekView {
-                    AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisMarks(values: periodDayStarts(days: periodDays)) { _ in
                         AxisGridLine()
                         AxisValueLabel(format: .dateTime.weekday(.abbreviated))
                     }
@@ -185,54 +204,10 @@ struct MacroBreakdownChart: View {
                             .font(.caption)
                         Text("\(Int(item.value))g")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                 }
             }
-        }
-    }
-}
-
-// MARK: - Macro Comparison Bar Chart
-
-struct MacroComparisonChart: View {
-    let currentProtein: Double
-    let currentCarbs: Double
-    let currentFat: Double
-    let goalProtein: Double
-    let goalCarbs: Double
-    let goalFat: Double
-
-    private var data: [(macro: String, current: Double, goal: Double, color: Color)] {
-        [
-            ("Protein", currentProtein, goalProtein, .red),
-            ("Carbs", currentCarbs, goalCarbs, .blue),
-            ("Fat", currentFat, goalFat, .yellow)
-        ]
-    }
-
-    var body: some View {
-        Chart {
-            ForEach(data, id: \.macro) { item in
-                BarMark(
-                    x: .value("Macro", item.macro),
-                    y: .value("Current", item.current)
-                )
-                .foregroundStyle(item.color)
-                .cornerRadius(4)
-
-                // Goal line
-                RuleMark(
-                    xStart: .value("Start", item.macro),
-                    xEnd: .value("End", item.macro),
-                    y: .value("Goal", item.goal)
-                )
-                .foregroundStyle(.primary.opacity(0.5))
-                .lineStyle(StrokeStyle(lineWidth: 2, dash: [4, 4]))
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading)
         }
     }
 }
@@ -244,8 +219,9 @@ struct MacroComparisonChart: View {
 /// line reads as a deficit and taller reads as a surplus.
 struct EnergyBalanceChart: View {
     let data: [(date: Date, intake: Int, expenditure: Int)]
+    let periodDays: Int
 
-    private var isWeekView: Bool { data.count <= 7 }
+    private var isWeekView: Bool { periodDays <= 7 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -271,9 +247,10 @@ struct EnergyBalanceChart: View {
                     }
                 }
             }
+            .chartXScale(domain: periodDomain(days: periodDays))
             .chartXAxis {
                 if isWeekView {
-                    AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisMarks(values: periodDayStarts(days: periodDays)) { _ in
                         AxisGridLine()
                         AxisValueLabel(format: .dateTime.weekday(.abbreviated))
                     }
@@ -682,7 +659,8 @@ private struct StatBox: View {
                 (Date().addingTimeInterval(-1*86400), 2050),
                 (Date(), 1900)
             ],
-            goal: 2000
+            goal: 2000,
+            periodDays: 7
         )
         .frame(height: 200)
 

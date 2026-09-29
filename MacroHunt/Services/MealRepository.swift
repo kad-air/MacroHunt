@@ -19,6 +19,10 @@ class MealRepository: ObservableObject {
     /// mirrors that run after the local save and never throw — a mirror failure must never
     /// undo a logged meal.
     ///
+    /// Returns as soon as the local save lands; the mirrors run in a background task. The
+    /// caller used to await them too, so a Craft outage (3 retries × 90–150 s timeouts) held
+    /// the "Saving meal…" overlay up for minutes on a meal that was already logged.
+    ///
     /// This inverts the app's earlier "Craft-first transactional" order. The product is
     /// local/on-device with Apple Health as the real store; Craft is an optional export, not
     /// a gate, so a Craft outage or a user who never configured Craft can still log normally.
@@ -29,10 +33,16 @@ class MealRepository: ObservableObject {
         modelContext.insert(meal)
         try modelContext.save()
 
-        // 2. Best-effort mirror: Craft Docs. Gated on the user's opt-in; never throws and
-        //    never undoes the local save. The doc id is persisted as soon as the item is
-        //    created so a later delete can still clean Craft up even if the content upload
-        //    (photos/notes) fails.
+        // 2. Best-effort mirrors, off the caller's critical path. The task inherits the main
+        //    actor, which `Meal` and the model context need.
+        Task { await mirror(meal) }
+    }
+
+    /// The Craft Docs and Apple Health mirrors for a freshly saved meal. Never throws.
+    private func mirror(_ meal: Meal) async {
+        // Craft Docs: gated on the user's opt-in; never undoes the local save. The doc id is
+        // persisted as soon as the item is created so a later delete can still clean Craft up
+        // even if the content upload (photos/notes) fails.
         if credentials.craftSyncActive {
             let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
             do {
@@ -40,6 +50,11 @@ class MealRepository: ObservableObject {
                     collectionId: credentials.collectionId,
                     meal: meal
                 )
+                // Deleted while the create was in flight: take the new Craft item back out.
+                guard !meal.isDeleted else {
+                    try? await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: docId)
+                    return
+                }
                 meal.craftDocId = docId
                 try? modelContext.save()
 
@@ -52,9 +67,14 @@ class MealRepository: ObservableObject {
             }
         }
 
-        // 3. Best-effort mirror: Apple Health. Same contract — gated, never throws.
-        if credentials.healthKitSyncEnabled {
+        // Apple Health: same contract — gated, never throws. Skipped if the meal was deleted
+        // while the Craft step was in flight.
+        if credentials.healthKitSyncEnabled, !meal.isDeleted {
             if let hkUUID = try? await HealthKitService.shared.saveMeal(meal) {
+                guard !meal.isDeleted else {
+                    try? await HealthKitService.shared.deleteMeal(healthKitFoodUUID: hkUUID)
+                    return
+                }
                 meal.healthKitFoodUUID = hkUUID
                 try? modelContext.save()
             }
@@ -63,26 +83,38 @@ class MealRepository: ObservableObject {
 
     // MARK: - Combined Delete (local-first)
 
-    /// Deletes a meal **local-first**: the best-effort mirrors (Craft, Apple Health) are
-    /// removed first — while their identifiers are still on the meal — then the authoritative
-    /// local delete runs. Mirror removals never throw; only the local delete can fail the
-    /// operation. A failed mirror cleanup leaves an orphan in Craft/Health but never blocks
-    /// removing the meal the user asked to delete.
+    /// Deletes a meal **local-first**: the mirror identifiers are captured, the authoritative
+    /// local delete runs (the only step that can fail), and then the Craft and Apple Health
+    /// copies are removed best-effort in a background task, so the row disappears at once
+    /// instead of waiting on Craft's retries. A failed mirror cleanup leaves an orphan in
+    /// Craft/Health but never blocks removing the meal the user asked to delete.
+    ///
+    /// A mirror is removed whenever the meal has one, even if that sync has since been
+    /// switched off: deleting a meal should take its copies with it (an orphaned Health
+    /// entry keeps counting toward the day's dietary energy).
     func deleteMealWithSync(_ meal: Meal) async throws {
-        // 1. Best-effort: remove the Craft mirror if it was synced. Never throws.
-        if credentials.craftSyncActive, let craftDocId = meal.craftDocId {
-            let craftAPI = CraftAPI(token: credentials.craftToken, spaceId: credentials.spaceId)
-            try? await craftAPI.deleteMealItem(collectionId: credentials.collectionId, itemId: craftDocId)
-        }
+        let craftDocId = meal.craftDocId
+        let hkUUID = meal.healthKitFoodUUID
 
-        // 2. Best-effort: remove the Apple Health mirror while the UUID is available. Never throws.
-        if credentials.healthKitSyncEnabled, let hkUUID = meal.healthKitFoodUUID {
-            try? await HealthKitService.shared.deleteMeal(healthKitFoodUUID: hkUUID)
-        }
-
-        // 3. Authoritative: local delete. If this throws, the meal is still logged.
+        // 1. Authoritative: local delete. If this throws, the meal is still logged and the
+        //    mirrors are left alone.
         modelContext.delete(meal)
         try modelContext.save()
+
+        // 2. Best-effort mirror cleanup with the captured ids. Never throws.
+        let craftConfigured = credentials.isCraftConfigured
+        let token = credentials.craftToken
+        let spaceId = credentials.spaceId
+        let collectionId = credentials.collectionId
+        Task {
+            if craftConfigured, let craftDocId {
+                let craftAPI = CraftAPI(token: token, spaceId: spaceId)
+                try? await craftAPI.deleteMealItem(collectionId: collectionId, itemId: craftDocId)
+            }
+            if let hkUUID {
+                try? await HealthKitService.shared.deleteMeal(healthKitFoodUUID: hkUUID)
+            }
+        }
     }
 
     // MARK: - Local-Only Operations (for internal use)
@@ -204,16 +236,18 @@ class MealRepository: ObservableObject {
     func dailyCaloriesForRange(days: Int) throws -> [(date: Date, calories: Int?)] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -(days - 1), to: today)!
+        let end = calendar.date(byAdding: .day, value: 1, to: today)!
 
-        var results: [(Date, Int?)] = []
-
-        for dayOffset in (0..<days).reversed() {
-            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
-            let meals = try fetchMealsForDate(date)
-            let calories = meals.isEmpty ? nil : meals.reduce(0) { $0 + $1.calories }
-            results.append((date, calories))
+        // One fetch for the whole window, bucketed by day (was one fetch per day).
+        var caloriesByDay: [Date: Int] = [:]
+        for meal in try fetchMealsInRange(from: start, to: end) {
+            caloriesByDay[calendar.startOfDay(for: meal.date), default: 0] += meal.calories
         }
 
-        return results
+        return (0..<days).reversed().map { dayOffset in
+            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
+            return (date, caloriesByDay[date])
+        }
     }
 }

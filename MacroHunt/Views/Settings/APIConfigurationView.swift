@@ -18,15 +18,15 @@ struct APIConfigurationView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             SectionHeader(title: "Claude API", icon: "sparkles")
 
-                            Text("Required. Powers photo & text meal analysis. Your key is stored only in this device's Keychain — it never leaves the device.")
+                            Text("Required. Powers photo & text meal analysis. Your key is stored in this device's Keychain and only ever sent to Anthropic.")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(Theme.ink2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("API Key")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                                 SecureField("Enter your Anthropic API key", text: $credentials.anthropicKey)
                                     .inputFieldStyle()
                             }
@@ -45,7 +45,7 @@ struct APIConfigurationView: View {
                                         .font(.subheadline.weight(.semibold))
                                     Text("Optional integration. Your meals always log on-device and to Apple Health — this also mirrors them into your Craft space. When off, nothing is sent to Craft.")
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(Theme.ink2)
                                 }
                             }
                             .tint(Theme.accent)
@@ -53,7 +53,7 @@ struct APIConfigurationView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("API Token")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                                 SecureField("Enter your Craft API token", text: $credentials.craftToken)
                                     .inputFieldStyle()
                             }
@@ -61,7 +61,7 @@ struct APIConfigurationView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Space ID")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                                 TextField("Enter your Space ID", text: $credentials.spaceId)
                                     .inputFieldStyle()
                             }
@@ -69,14 +69,14 @@ struct APIConfigurationView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Collection ID")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                                 TextField("Meal Tracker collection ID", text: $credentials.collectionId)
                                     .inputFieldStyle()
                             }
 
                             Text("More export integrations (Notion, Google Sheets) are on the way.")
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(Theme.ink2)
                         }
                     }
                     .padding(.horizontal)
@@ -102,7 +102,7 @@ struct APIConfigurationView: View {
                             if let error = credentials.configurationError {
                                 Text(error)
                                     .font(.caption)
-                                    .foregroundColor(.orange)
+                                    .foregroundStyle(Theme.warn)
                             }
                         }
                     }
@@ -147,7 +147,7 @@ struct APIConfigurationView: View {
     private func statusRow(ok: Bool, onText: String, offText: String, neutral: Bool = false) -> some View {
         HStack {
             Image(systemName: ok ? "checkmark.circle.fill" : (neutral ? "minus.circle.fill" : "xmark.circle.fill"))
-                .foregroundColor(ok ? .green : (neutral ? .secondary : .red))
+                .foregroundStyle(ok ? Theme.good : (neutral ? Theme.ink3 : Theme.protein))
             Text(ok ? onText : offText)
                 .font(.subheadline)
         }
