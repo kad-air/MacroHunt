@@ -170,6 +170,29 @@ freshDefaults.set(1800, forKey: "dailyCalorieGoal")
 check(CredentialsManager(defaults: freshDefaults).dailyCalorieGoal == 1800, "a stored calorie goal still wins over the default")
 freshDefaults.removePersistentDomain(forName: suiteName)
 
+section("Reflection snapshot units (ReflectionSnapshot.render)")
+
+// 1 lb = 0.45359237 kg exactly, so 180 lb = 81.6466266 kg and 85.2 kg = 187.83 lb.
+func snapshot(unit: WeightUnit) -> ReflectionSnapshot {
+    var s = ReflectionSnapshot(
+        calorieGoal: 2000, proteinGoal: 100, carbsGoal: 250, fatGoal: 66, macroSplitName: "Balanced",
+        weightUnit: unit, weightGoalKg: 180 * 0.45359237, weightGoalDirection: .lose
+    )
+    s.today = .init(calories: 900, protein: 60, carbs: 90, fat: 30)
+    s.weekTrackedDays = 5
+    s.weekAverages = .init(calories: 1850, protein: 95, carbs: 210, fat: 65)
+    s.dailyCalories = [1900, nil, 1750, 2100, nil, 1800, 900]
+    s.latestWeightKg = 85.2
+    return s
+}
+let pounds = snapshot(unit: .pounds).render()
+check(pounds.contains("Weight goal: 180.0 lb (lose)"), "a pounds user's weight goal renders as 180.0 lb (was always kg)")
+check(pounds.contains("Latest weight: 187.8 lb"), "a pounds user's latest weight renders in lb (85.2 kg → 187.8 lb)")
+check(!pounds.contains(" kg"), "a pounds user's snapshot never mentions kg")
+check(pounds.contains("State every weight in lb"), "the snapshot tells Claude which weight unit to use")
+check(snapshot(unit: .kilograms).render().contains("Weight goal: 81.6 kg (lose)"), "a kilograms user's weight goal renders as 81.6 kg")
+check(pounds.contains("Daily calories (oldest→newest): 1900, untracked, 1750"), "untracked days render as \"untracked\", not 0")
+
 section("Meal type default (MealType.suggested)")
 func at(_ hour: Int, _ minute: Int = 0) -> Date {
     Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: Date())!
@@ -215,17 +238,14 @@ if ProcessInfo.processInfo.environment["OFFLINE"] == "1" {
     }
 
     do {
-        let reflection = try await claude.generateReflection(context: """
-        GOALS
-        - Daily calorie goal: 2000 kcal
-        TODAY
-        - Eaten so far: 900 kcal · P 60 g · C 90 g · F 30 g
-        LAST 7 DAYS
-        - Logged 5 of the last 7 days
-        - Averages over the days they logged: 1850 kcal/day · P 95 g · C 210 g · F 65 g
-        """)
+        // The real renderer, for a pounds user with a weight goal: the reflection must not
+        // talk about weight in kilograms (it did, on device, before the snapshot carried units).
+        let reflection = try await claude.generateReflection(context: snapshot(unit: .pounds).render())
         check(!reflection.headline.isEmpty && !reflection.observations.isEmpty && !reflection.suggestion.isEmpty,
               "reflection call succeeds with a headline, \(reflection.observations.count) observations and a suggestion")
+        let text = ([reflection.headline, reflection.suggestion, reflection.encouragement] + reflection.observations).joined(separator: " ")
+        check(!text.localizedCaseInsensitiveContains(" kg") && !text.localizedCaseInsensitiveContains("kilogram"),
+              "a pounds user's reflection never states weight in kg")
     } catch {
         check(false, "reflection call succeeds (threw: \(error.localizedDescription))")
     }
