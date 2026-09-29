@@ -204,9 +204,14 @@ if [ "${SKIP_TESTS:-0}" != "1" ]; then
   TEST_LOG="$OUT_DIR/tests-$STAMP.log"
   # Status is read explicitly, never through a pipeline: an earlier version piped xcodebuild into
   # grep with `|| true`, which reset PIPESTATUS and reported a FAILED UI test as passed.
+  # No parallel testing: with it on, xcodebuild runs the (single) test on two ~8 GB clones of the
+  # Duo in ~/Library/Developer/XCTestDevices (internal SSD). Under that load the app's idle
+  # signal timed out after the Add-meal tap (a 393 s failure, 2026-09-28) that the same code
+  # passed in 32 s on the Duo itself. (The Duo still ends up shut down after a test run.)
   set +e
   xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
     -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DD" \
+    -parallel-testing-enabled NO \
     test -quiet > "$TEST_LOG" 2>&1
   TEST_STATUS=$?
   set -e

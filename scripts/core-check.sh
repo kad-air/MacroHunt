@@ -10,10 +10,11 @@
 #   offline  photo payloads stay under the API's 5 MB / 1568 px limits and upright;
 #            Claude responses decode past a leading thinking block, and truncation,
 #            refusals and HTTP errors surface as specific errors; a fresh install's
-#            calorie goal is 2000 (it was 0); meal-type defaults.
+#            calorie goal is 2000 (it was 0); the reflection snapshot renders weights in
+#            the user's unit (it was always kg); meal-type defaults.
 #   live     needs ANTHROPIC_API_KEY. A text analyze call is checked against USDA values
 #            for two large hard-boiled eggs, a photo analyze call must be accepted, and a
-#            reflection must come back. This is what proves the model, effort and fallback
+#            pounds user's reflection must come back without mentioning kg. This is what proves the model, effort and fallback
 #            settings in ClaudeAPI.swift are accepted by the real API. About a cent per run.
 #
 # No simulator, no signing, nothing written to the keychain.
@@ -26,6 +27,7 @@ mkdir -p "$OUT_DIR"
 SOURCES=(
   "$ROOT/MacroHunt/Models/Meal.swift"
   "$ROOT/MacroHunt/Services/ClaudeAPI.swift"
+  "$ROOT/MacroHunt/Services/ReflectionContext.swift"
   "$ROOT/MacroHunt/Utilities/APIError.swift"
   "$ROOT/MacroHunt/Utilities/NetworkConfig.swift"
   "$ROOT/MacroHunt/Utilities/ImageDownsampler.swift"

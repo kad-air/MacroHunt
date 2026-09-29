@@ -358,9 +358,11 @@ final class ReflectionViewModel: ObservableObject {
         return nil
     }
 
-    private static let cacheDayKey = "reflection.cache.day"
-    private static let cacheJSONKey = "reflection.cache.json"
-    private static let cacheMealCountKey = "reflection.cache.mealCount"
+    // v2: bumped when the snapshot started using the user's weight unit, so a reflection
+    // cached from the old always-kg snapshot isn't shown again.
+    private static let cacheDayKey = "reflection.cache.v2.day"
+    private static let cacheJSONKey = "reflection.cache.v2.json"
+    private static let cacheMealCountKey = "reflection.cache.v2.mealCount"
 
     /// Loads today's reflection: from the in-memory/disk cache when it still matches today's
     /// meal count, otherwise generates a fresh one (only when reflections are on and a key is
@@ -444,66 +446,48 @@ final class ReflectionViewModel: ObservableObject {
 
     private func buildContext(modelContext: ModelContext, credentials: CredentialsManager) async -> String {
         let repo = MealRepository(modelContext: modelContext, credentials: credentials)
-        var lines: [String] = []
+        let hk = HealthKitService.shared
 
-        // Goals
-        lines.append("GOALS")
-        lines.append("- Daily calorie goal: \(credentials.dailyCalorieGoal) kcal")
-        lines.append("- Macro goals: protein \(credentials.proteinGoal) g, carbs \(credentials.carbsGoal) g, fat \(credentials.fatGoal) g (\(credentials.macroSplit.displayName) split)")
-        if credentials.hasWeightGoal {
-            lines.append("- Weight goal: \(String(format: "%.1f", credentials.weightGoalKg)) kg (\(credentials.weightGoalDirection.displayName.lowercased()))")
-        }
+        var snapshot = ReflectionSnapshot(
+            calorieGoal: credentials.dailyCalorieGoal,
+            proteinGoal: credentials.proteinGoal,
+            carbsGoal: credentials.carbsGoal,
+            fatGoal: credentials.fatGoal,
+            macroSplitName: credentials.macroSplit.displayName,
+            // The same source as Settings' Units row: Apple Health's preferred body-mass unit.
+            weightUnit: await hk.preferredWeightUnit(),
+            weightGoalKg: credentials.hasWeightGoal ? credentials.weightGoalKg : nil,
+            weightGoalDirection: credentials.weightGoalDirection
+        )
 
         // Today + week intake
         if let today = try? repo.dailyTotals(for: Date()) {
-            lines.append("\nTODAY")
-            lines.append("- Eaten so far: \(today.calories) kcal · P \(Int(today.protein)) g · C \(Int(today.carbs)) g · F \(Int(today.fat)) g")
+            snapshot.today = .init(calories: Double(today.calories), protein: today.protein, carbs: today.carbs, fat: today.fat)
         }
         if let week = try? repo.weeklyAverages() {
-            lines.append("\nLAST 7 DAYS")
-            if week.trackedDays > 0 {
-                lines.append("- Logged \(week.trackedDays) of the last 7 days")
-                lines.append("- Averages over the days they logged: \(Int(week.avgCalories)) kcal/day · P \(Int(week.avgProtein)) g · C \(Int(week.avgCarbs)) g · F \(Int(week.avgFat)) g")
-            } else {
-                lines.append("- No meals logged in the last 7 days")
-            }
+            snapshot.weekTrackedDays = week.trackedDays
+            snapshot.weekAverages = .init(calories: week.avgCalories, protein: week.avgProtein, carbs: week.avgCarbs, fat: week.avgFat)
         }
         if let daily = try? repo.dailyCaloriesForRange(days: 7) {
-            let series = daily.map { $0.calories.map(String.init) ?? "untracked" }.joined(separator: ", ")
-            lines.append("- Daily calories (oldest→newest): \(series)")
-            lines.append("- Note: \"untracked\" means no meal was logged that day — the user simply didn't track it, not that they fasted or ate at a deficit. Don't read untracked days as low-calorie days, and don't scold missed logging.")
+            snapshot.dailyCalories = daily.map(\.calories)
         }
 
         // Health (best-effort)
-        let hk = HealthKitService.shared
         if hk.isHealthDataAvailable {
-            var health: [String] = []
-            if let weight = await hk.latestBodyMass() {
-                health.append("- Latest weight: \(String(format: "%.1f", weight.kilograms)) kg")
-            }
+            snapshot.latestWeightKg = await hk.latestBodyMass()?.kilograms
             let active = await hk.dailyActiveEnergy(days: 7)
             if !active.isEmpty {
-                let avg = active.map(\.value).reduce(0, +) / Double(active.count)
-                health.append("- Avg active energy: \(Int(avg)) kcal/day")
+                snapshot.avgActiveEnergy = active.map(\.value).reduce(0, +) / Double(active.count)
             }
             let steps = await hk.dailySteps(days: 7)
             if !steps.isEmpty {
-                let avg = steps.map(\.value).reduce(0, +) / Double(steps.count)
-                health.append("- Avg steps: \(Int(avg))/day")
+                snapshot.avgSteps = steps.map(\.value).reduce(0, +) / Double(steps.count)
             }
-            if let rhr = await hk.latestRestingHeartRate() {
-                health.append("- Resting heart rate: \(Int(rhr.value)) bpm")
-            }
-            if let hrv = await hk.latestHRV() {
-                health.append("- HRV (SDNN): \(Int(hrv.value)) ms")
-            }
-            if !health.isEmpty {
-                lines.append("\nAPPLE HEALTH")
-                lines.append(contentsOf: health)
-            }
+            snapshot.restingHeartRate = await hk.latestRestingHeartRate()?.value
+            snapshot.hrv = await hk.latestHRV()?.value
         }
 
-        return lines.joined(separator: "\n")
+        return snapshot.render()
     }
 
     // MARK: Cache
