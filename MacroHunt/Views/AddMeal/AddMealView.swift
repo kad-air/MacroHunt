@@ -93,58 +93,107 @@ struct AddMealView: View {
 
     // MARK: - Capture
 
+    /// Narrowest a capture column may get before the form drops back to one column.
+    private static let minCaptureColumnWidth: CGFloat = 280
+
     private var captureView: some View {
         VStack(alignment: .leading, spacing: 17) {
             sheetHeader("Add a meal")
 
-            VStack(alignment: .leading, spacing: 9) {
-                fieldLabel("Photos")
-                PhotoCaptureView(selectedPhotos: $selectedPhotos)
-            }
-            .padding(.top, 6)
+            // On the Duo's open inner display this sheet is a ~650 pt page sheet, and a sheet's
+            // size class doesn't say how wide it is, so the form picks by fit: photos and
+            // description beside meal type, time and Analyze when two columns fit, otherwise
+            // the single column every iPhone (and the Duo's cover display) shows.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 17) {
+                        photosField
+                        descriptionField
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
 
-            VStack(alignment: .leading, spacing: 9) {
-                fieldLabel("Description")
-                TextField("What are you eating?", text: $description, axis: .vertical)
-                    .lineLimit(2...4)
-                    .inputFieldStyle()
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                fieldLabel("Meal type")
-                MealTypeSelector(selectedType: $mealType)
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                fieldLabel("When")
-                HStack {
-                    Image(systemName: "clock").font(.system(size: 15)).foregroundStyle(Theme.ink2)
-                    DatePicker("", selection: $mealDate, in: ...Date())
-                        .datePickerStyle(.compact)
-                        .labelsHidden()
-                    Spacer()
+                    VStack(alignment: .leading, spacing: 17) {
+                        mealTypeField
+                        whenField
+                        analyzeButton
+                    }
+                    .padding(.top, 6)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(.vertical, 9)
-                .padding(.horizontal, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(Theme.chip)
-                        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Theme.hair, lineWidth: 1))
+                // idealWidth pins what ViewThatFits measures, whatever the fields' own ideals.
+                .frame(
+                    minWidth: 2 * Self.minCaptureColumnWidth + 18,
+                    idealWidth: 2 * Self.minCaptureColumnWidth + 18,
+                    maxWidth: .infinity
                 )
-            }
 
-            Button {
-                analyzePhotos()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                    Text("Analyze with AI")
+                VStack(alignment: .leading, spacing: 17) {
+                    photosField
+                    descriptionField
+                    mealTypeField
+                    whenField
+                    analyzeButton
                 }
             }
-            .buttonStyle(PrimaryButtonStyle(isEnabled: canAnalyze))
-            .disabled(!canAnalyze)
-            .padding(.top, 4)
         }
+    }
+
+    private var photosField: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            fieldLabel("Photos")
+            PhotoCaptureView(selectedPhotos: $selectedPhotos)
+        }
+        .padding(.top, 6)
+    }
+
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            fieldLabel("Description")
+            TextField("What are you eating?", text: $description, axis: .vertical)
+                .lineLimit(2...4)
+                .inputFieldStyle()
+        }
+    }
+
+    private var mealTypeField: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            fieldLabel("Meal type")
+            MealTypeSelector(selectedType: $mealType)
+        }
+    }
+
+    private var whenField: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            fieldLabel("When")
+            HStack {
+                Image(systemName: "clock").font(.system(size: 15)).foregroundStyle(Theme.ink2)
+                DatePicker("", selection: $mealDate, in: ...Date())
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                Spacer()
+            }
+            .padding(.vertical, 9)
+            .padding(.horizontal, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Theme.chip)
+                    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Theme.hair, lineWidth: 1))
+            )
+        }
+    }
+
+    private var analyzeButton: some View {
+        Button {
+            analyzePhotos()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                Text("Analyze with AI")
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle(isEnabled: canAnalyze))
+        .disabled(!canAnalyze)
+        .padding(.top, 4)
     }
 
     /// Analysis requires at least a photo or a non-empty description.

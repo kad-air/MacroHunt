@@ -6,6 +6,7 @@ import UIKit
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isWideLayout) private var isWide
     @EnvironmentObject var credentials: CredentialsManager
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
@@ -41,37 +42,41 @@ struct TodayView: View {
                         header
                             .padding(.bottom, 18)
 
-                        summaryCard
+                        // Wide (the Duo's open inner display): the day's numbers and reflection
+                        // on the left, the meal list beside them on the right.
+                        WideColumns {
+                            summaryCard
 
-                        if credentials.dailyReflectionEnabled {
-                            SectionHeader(title: "Today")
-                                .padding(.horizontal, 4)
-                                .padding(.top, 30)
-                                .padding(.bottom, 13)
-                            reflectionCard
-                        }
-
-                        SectionHeader(title: "Meals · \(todayMeals.count) logged")
-                            .padding(.horizontal, 4)
-                            .padding(.top, 30)
-                            .padding(.bottom, 13)
-
-                        if todayMeals.isEmpty {
-                            emptyState
-                        } else {
-                            ForEach(todayMeals) { meal in
-                                MealCard(meal: meal)
-                                    .padding(.bottom, 10)
-                                    .contextMenu {
-                                        Button(role: .destructive) { deleteMeal(meal) } label: {
-                                            Label("Delete meal", systemImage: "trash")
-                                        }
-                                    }
+                            if credentials.dailyReflectionEnabled {
+                                SectionHeader(title: "Today")
+                                    .padding(.horizontal, 4)
+                                    .padding(.top, 30)
+                                    .padding(.bottom, 13)
+                                reflectionCard
                             }
-                        }
+                        } trailing: {
+                            SectionHeader(title: "Meals · \(todayMeals.count) logged")
+                                .padding(.horizontal, 4)
+                                .padding(.top, isWide ? 0 : 30)
+                                .padding(.bottom, 13)
 
-                        logNextRow
-                            .padding(.top, 2)
+                            if todayMeals.isEmpty {
+                                emptyState
+                            } else {
+                                ForEach(todayMeals) { meal in
+                                    MealCard(meal: meal)
+                                        .padding(.bottom, 10)
+                                        .contextMenu {
+                                            Button(role: .destructive) { deleteMeal(meal) } label: {
+                                                Label("Delete meal", systemImage: "trash")
+                                            }
+                                        }
+                                }
+                            }
+
+                            logNextRow
+                                .padding(.top, 2)
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 24)
