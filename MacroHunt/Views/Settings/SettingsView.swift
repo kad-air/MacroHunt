@@ -38,18 +38,22 @@ struct SettingsView: View {
                         MHHeader(kicker: "Preferences & goals", title: "Settings")
                             .padding(.bottom, 6)
 
-                        section("Goals")
-                        dailyTargetCard
-                        weightTargetCard.padding(.top, 14)
+                        // Wide (the Duo's open inner display): goals on the left, connections,
+                        // preferences and integrations beside them.
+                        WideColumns {
+                            section("Goals")
+                            dailyTargetCard
+                            weightTargetCard.padding(.top, 14)
+                        } trailing: {
+                            section("Connections")
+                            connectionsCard
 
-                        section("Connections")
-                        connectionsCard
+                            section("Preferences")
+                            preferencesCard
 
-                        section("Preferences")
-                        preferencesCard
-
-                        section("Integrations")
-                        integrationsCard
+                            section("Integrations")
+                            integrationsCard
+                        }
 
                         appInfo
                     }

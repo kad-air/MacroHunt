@@ -396,6 +396,7 @@ final class HealthTrendsViewModel: ObservableObject {
 
 struct TrendsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.isWideLayout) private var isWide
     @EnvironmentObject var credentials: CredentialsManager
 
     @Query(sort: \Meal.date, order: .reverse) private var allMeals: [Meal]
@@ -423,9 +424,9 @@ struct TrendsView: View {
                     VStack(spacing: 24) {
                         // Header
                         MHHeader(kicker: selectedPeriod == .week ? "Last 7 days" : "Last 30 days", title: "Trends")
-                            .padding(.horizontal)
 
-                        // Period Selector
+                        // Period Selector (a two-option pill stretched across the wide layout
+                        // reads oddly, so it keeps a column's width there)
                         SegmentedToggle(
                             options: TimePeriod.allCases.map { $0.rawValue },
                             selection: Binding(
@@ -433,58 +434,59 @@ struct TrendsView: View {
                                 set: { raw in if let p = TimePeriod(rawValue: raw) { selectedPeriod = p } }
                             )
                         )
-                        .padding(.horizontal)
+                        .frame(maxWidth: isWide ? 360 : nil)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        // Meal-based calorie trend
-                        if !filteredMeals.isEmpty {
-                            calorieTrendSection
-                                .padding(.horizontal)
-                        }
+                        // Wide (the Duo's open inner display): the Week/Month cards on the
+                        // left, weight / activity / cardio on the right.
+                        WideColumns(spacing: 24) {
+                            // Meal-based calorie trend
+                            if !filteredMeals.isEmpty {
+                                calorieTrendSection
+                            }
 
-                        // Health: calories in vs. out
-                        if health.hasEnergyData {
-                            energyBalanceSection
-                                .padding(.horizontal)
-                        }
+                            // Health: calories in vs. out
+                            if health.hasEnergyData {
+                                energyBalanceSection
+                            }
 
-                        // Meal-based macro sections
-                        if !filteredMeals.isEmpty {
-                            macroBreakdownSection
-                                .padding(.horizontal)
+                            // Meal-based macro sections
+                            if !filteredMeals.isEmpty {
+                                macroBreakdownSection
 
-                            averagesSection
-                                .padding(.horizontal)
-                        }
+                                averagesSection
+                            }
+                        } trailing: {
+                            // Health: weight vs. target. Anchored on the range-independent latest
+                            // weight (not the selected-range series) so the card and its range
+                            // picker stay put even when a range happens to have no weigh-ins.
+                            if health.latestWeightKg != nil || health.hasWeightData || credentials.hasWeightGoal {
+                                weightSection
+                            }
 
-                        // Health: weight vs. target. Anchored on the range-independent latest
-                        // weight (not the selected-range series) so the card and its range
-                        // picker stay put even when a range happens to have no weigh-ins.
-                        if health.latestWeightKg != nil || health.hasWeightData || credentials.hasWeightGoal {
-                            weightSection
-                                .padding(.horizontal)
-                        }
+                            // Health: activity + cardio
+                            if health.hasActivityData {
+                                activitySection
+                            }
+                            if health.hasCardioData {
+                                cardioSection
+                            }
 
-                        // Health: activity + cardio
-                        if health.hasActivityData {
-                            activitySection
-                                .padding(.horizontal)
-                        }
-                        if health.hasCardioData {
-                            cardioSection
-                                .padding(.horizontal)
+                            // Invite to connect Apple Health (available but no data read yet).
+                            // Never shown together with the empty state below.
+                            if showConnectCTA {
+                                connectHealthCard
+                            }
                         }
 
                         // Nothing to show yet
                         if filteredMeals.isEmpty && !health.hasAnyData && !showConnectCTA {
                             emptyState
                         }
-
-                        // Invite to connect Apple Health (available but no data read yet)
-                        if showConnectCTA {
-                            connectHealthCard
-                                .padding(.horizontal)
-                        }
                     }
+                    // Once for every card (each used to carry its own), so the wide layout's
+                    // column gap is the same 18 pt as on the other tabs.
+                    .padding(.horizontal)
                     .padding(.top, 8)
                     .padding(.bottom, 24)
                 }

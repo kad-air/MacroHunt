@@ -13,6 +13,10 @@ struct MealTypeSelector: View {
                 } label: {
                     Text(type.rawValue)
                         .font(.system(size: 13, weight: .semibold))
+                        // Only bites in the Add sheet's narrower two-column form; on an
+                        // iPhone-width row "Breakfast" fits at full size.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(isOn ? Theme.accent : Theme.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)

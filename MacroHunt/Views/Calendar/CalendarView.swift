@@ -9,6 +9,7 @@ private struct DaySelection: Identifiable {
 
 struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.isWideLayout) private var isWide
     @EnvironmentObject var credentials: CredentialsManager
 
     @Query(sort: \Meal.date) private var allMeals: [Meal]
@@ -34,14 +35,25 @@ struct CalendarView: View {
                         MHHeader(kicker: monthYearString(from: currentMonth), title: "Calendar")
                             .padding(.bottom, 18)
 
-                        calendarCard
+                        // Wide (the Duo's open inner display): month on the left, the selected
+                        // day — summary plus its meals — beside it, master–detail style.
+                        WideColumns {
+                            calendarCard
+                        } trailing: {
+                            SectionHeader(title: "Selected day")
+                                .padding(.horizontal, 4)
+                                .padding(.top, isWide ? 0 : 30)
+                                .padding(.bottom, 13)
 
-                        SectionHeader(title: "Selected day")
-                            .padding(.horizontal, 4)
-                            .padding(.top, 30)
-                            .padding(.bottom, 13)
+                            daySummaryCard
 
-                        daySummaryCard
+                            if isWide {
+                                ForEach(mealsForDate(selectedDate) ?? []) { meal in
+                                    MealCard(meal: meal)
+                                        .padding(.top, 10)
+                                }
+                            }
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 24)
@@ -94,7 +106,10 @@ struct CalendarView: View {
                                 isFuture: calendar.startOfDay(for: date) > calendar.startOfDay(for: Date())
                             ) {
                                 selectedDate = date
-                                if (stats[calendar.startOfDay(for: date)]?.count ?? 0) > 0 {
+                                // Wide shows the day's meals beside the grid already; the
+                                // sheet (where past meals are deleted) stays one tap away
+                                // on the summary's Details.
+                                if !isWide, (stats[calendar.startOfDay(for: date)]?.count ?? 0) > 0 {
                                     detailDay = DaySelection(date: date)
                                 }
                             }

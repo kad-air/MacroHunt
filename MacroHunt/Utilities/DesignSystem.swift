@@ -254,6 +254,51 @@ struct AddMealToolbarItem: ToolbarContent {
     }
 }
 
+// MARK: - Wide layout (iPhone Duo inner display)
+
+extension EnvironmentValues {
+    /// True where the tab roots switch from one column to two: regular width AND regular
+    /// height. That is the iPhone Duo's open inner display (and iPad); the Duo's cover display
+    /// and an iPhone in portrait are compact width, an iPhone in landscape is compact height,
+    /// so every iPhone layout stays the single column it always was. Size classes only — never
+    /// `userInterfaceIdiom`, `UIScreen` or orientation (CLAUDE.md, "iPhone Duo").
+    var isWideLayout: Bool {
+        horizontalSizeClass == .regular && verticalSizeClass == .regular
+    }
+}
+
+/// Two top-aligned columns side by side on a wide layout (`isWideLayout`); otherwise the
+/// leading views followed by the trailing views, handed straight to the enclosing stack
+/// unwrapped, so the single-column layout (order, spacing, padding) is exactly what it was.
+/// `spacing` is the gap between views within a column: pass the enclosing stack's spacing.
+struct WideColumns<Leading: View, Trailing: View>: View {
+    @Environment(\.isWideLayout) private var isWide
+
+    private let spacing: CGFloat
+    private let leading: Leading
+    private let trailing: Trailing
+
+    init(spacing: CGFloat = 0, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
+        self.spacing = spacing
+        self.leading = leading()
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        if isWide {
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: spacing) { leading }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                VStack(alignment: .leading, spacing: spacing) { trailing }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        } else {
+            leading
+            trailing
+        }
+    }
+}
+
 // MARK: - Button styles
 
 struct PrimaryButtonStyle: ButtonStyle {
