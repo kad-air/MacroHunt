@@ -34,7 +34,9 @@ final class DuoBarsUITests: XCTestCase {
         let tabs = ["Today", "Calendar", "Trends", "Settings"].map { loose(app, $0) }
         for (label, element) in zip(["Today", "Calendar", "Trends", "Settings"], tabs) {
             XCTAssertTrue(element.waitForExistence(timeout: 20), "\"\(label)\" tab never appeared")
-            XCTAssertTrue(element.isHittable, "\"\(label)\" tab exists but isn't hittable")
+            let hittable = waitForHittable(element)
+            if !hittable { attachTree(app, "not-hittable-\(label.lowercased())", element) }
+            XCTAssertTrue(hittable, "\"\(label)\" tab exists but isn't hittable after 10 s (frame \(element.frame))")
         }
 
         let screen = currentScreenSize(app)
@@ -84,6 +86,25 @@ final class DuoBarsUITests: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         return env["SIMULATOR_MODEL_IDENTIFIER"] == "iPhone19,4"
             || (env["SIMULATOR_DEVICE_NAME"] ?? "").localizedCaseInsensitiveContains("duo")
+    }
+
+    /// `isHittable` once the launch has settled. The tabs exist before the launch animation ends:
+    /// on the Duo's cover (Xcode 27.1, iOS 27.1 24A94401, 2026-11-11) the window was still
+    /// zooming in from the icon — it reported 155×226pt, a third of the 466×678pt display — so
+    /// an instant `isHittable` read failed for a "Today" tab that was hittable a moment later.
+    private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
+        return XCTWaiter().wait(for: [hittable], timeout: timeout) == .completed
+    }
+
+    /// The element and the app's whole accessibility tree, plus the lit screen, when a lookup
+    /// misbehaves — "exists but isn't hittable" alone doesn't say what is covering the element.
+    private func attachTree(_ app: XCUIApplication, _ name: String, _ element: XCUIElement) {
+        let tree = XCTAttachment(string: "element:\n\(element.debugDescription)\n\napp:\n\(app.debugDescription)")
+        tree.name = name
+        tree.lifetime = .keepAlways
+        add(tree)
+        attachScreenshot(name)
     }
 
     /// Kept in the `.xcresult` regardless of outcome (see the class doc).
