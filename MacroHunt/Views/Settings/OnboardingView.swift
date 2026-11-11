@@ -1,5 +1,6 @@
 // Views/Settings/OnboardingView.swift
 import SwiftUI
+import SwiftData
 import HealthKit
 
 struct OnboardingView: View {

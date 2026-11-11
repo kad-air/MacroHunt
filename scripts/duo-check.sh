@@ -122,14 +122,24 @@ fi
 # ── 4. Release build for the Duo simulator ─────────────────────────────────────────────────
 echo "building Release for the Duo simulator…"
 BUILD_LOG="$OUT_DIR/build-$STAMP.log"
+# CLEAN build, so every source file is compiled and reports its warnings: an incremental build only
+# re-reports the files it recompiles, and the warnings assertion below would then pass on nothing.
 set +e
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
   -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath "$DD" \
-  build -quiet > "$BUILD_LOG" 2>&1
+  clean build -quiet > "$BUILD_LOG" 2>&1
 BUILD_STATUS=$?
 set -e
 grep -E "error:|warning:" "$BUILD_LOG" | head -20 | sed 's/^/  /' || true
 [ "$BUILD_STATUS" -eq 0 ] || fail "Release build for the Duo simulator failed (exit $BUILD_STATUS, log: $BUILD_LOG)"
+# Any compiler/project warning on a file path fails the check (SDK interface notes and DerivedData
+# are excluded): a new SDK announces what it will break as warnings first. Xcode 27.1 flagged three
+# views that used ModelContext without importing SwiftData. (`-quiet` also prints "error: the
+# following command failed with exit code 0" for a compile step that only warned; that's not an error.)
+SRC_WARNINGS="$(grep -E '^/[^ ].*: warning: ' "$BUILD_LOG" | grep -v -F "$DD/" | sort -u || true)"
+[ -z "$SRC_WARNINGS" ] || fail "$(printf '%s\n' "$SRC_WARNINGS" | wc -l | tr -d ' ') build warning(s) in $SCHEME (log: $BUILD_LOG):
+$SRC_WARNINGS"
+ok "no build warnings in $SCHEME (clean Release build)"
 APP="$DD/Build/Products/Release-iphonesimulator/$SCHEME.app"
 [ -d "$APP" ] || fail "built app not found at $APP"
 
@@ -180,20 +190,36 @@ print(int(sum(px) / max(1, len(px))))
 PY
 }
 LIT=0; SHOTS=""
+# simctl's screenshot is written by the simulator service, which macOS denies writing to the
+# external iOS-Dev volume (NSCocoaErrorDomain 513 / EPERM, 2026-11-11; the 2026-09-28 run, when
+# iOS-Dev was still a disk image, wrote here fine), so every selector "failed". Capture onto the
+# internal disk's TMPDIR, then this shell (which can write iOS-Dev) makes a PNG of each in OUT_DIR.
+SHOT_TMP="$(mktemp -d "${TMPDIR:-/tmp}/macrohunt-duo-shot.XXXXXX")"
 for d in internal 1 2 3 4; do
-  BMP="$OUT_DIR/duo-$STAMP-display-$d.bmp"
+  BMP="$SHOT_TMP/duo-$STAMP-display-$d.bmp"
   # perl forks the capture, kills it after 20 s and exits 124 itself — a plain `alarm; exec`
   # dies by SIGALRM and bash then prints "Alarm clock" for every selector that hangs
+  set +e
   perl -e 'my $p = fork; if (!$p) { exec @ARGV } $SIG{ALRM} = sub { kill 9, $p; waitpid $p, 0; exit 124 }; alarm 20; waitpid $p, 0; exit($? >> 8)' \
-    xcrun simctl io "$UDID" screenshot --type=bmp "--display=$d" "$BMP" >/dev/null 2>&1 || { rm -f "$BMP"; continue; }
-  [ -s "$BMP" ] || { rm -f "$BMP"; continue; }
-  PNG="${BMP%.bmp}.png"; sips -s format png "$BMP" --out "$PNG" >/dev/null 2>&1 && rm -f "$BMP" || PNG="$BMP"
+    xcrun simctl io "$UDID" screenshot --type=bmp "--display=$d" "$BMP" >/dev/null 2>"$SHOT_TMP/err"
+  SHOT_RC=$?
+  set -e
+  if [ "$SHOT_RC" -ne 0 ] || [ ! -s "$BMP" ]; then
+    # Say why: the failed selectors above were otherwise indistinguishable from a hang.
+    WHY="exit $SHOT_RC"; [ "$SHOT_RC" -eq 124 ] && WHY="timed out after 20 s"
+    echo "  display=$d: no capture ($WHY) $(tr '\n' ' ' < "$SHOT_TMP/err" | cut -c1-200)"
+    rm -f "$BMP"; continue
+  fi
+  BR="$(bmp_brightness "$BMP")"
+  PNG="$OUT_DIR/duo-$STAMP-display-$d.png"
+  sips -s format png "$BMP" --out "$PNG" >/dev/null 2>&1 || { PNG="$OUT_DIR/${BMP##*/}"; cp "$BMP" "$PNG"; }
+  rm -f "$BMP"
   DIM="$(sips -g pixelWidth -g pixelHeight "$PNG" 2>/dev/null | awk '/pixel/ {v[++n]=$2} END {print v[1] "x" v[2]}')"
-  BR="$( [ "${PNG##*.}" = bmp ] && bmp_brightness "$PNG" || { sips -s format bmp "$PNG" --out "$OUT_DIR/.br.bmp" >/dev/null 2>&1 && bmp_brightness "$OUT_DIR/.br.bmp"; } )"; rm -f "$OUT_DIR/.br.bmp"
   echo "  display=$d: $PNG (${DIM}px, mean brightness ${BR:-?})"
   SHOTS="$SHOTS $PNG"
   [ "${BR:-0}" -gt 5 ] && LIT=$((LIT+1))
 done
+rm -rf "$SHOT_TMP"
 [ -n "$SHOTS" ] || fail "no display selector produced a screenshot"
 [ "$LIT" -gt 0 ] || fail "every captured panel is black — $SCHEME is running but nothing is drawing (check Device Hub is attached and which pose the Duo is in)"
 ok "$LIT lit panel(s) captured under $OUT_DIR for eyes-on review"

@@ -1,5 +1,6 @@
 // Views/AddMeal/AddMealView.swift
 import SwiftUI
+import SwiftData
 import UIKit
 
 struct AddMealView: View {

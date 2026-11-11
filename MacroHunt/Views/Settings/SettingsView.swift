@@ -1,5 +1,6 @@
 // Views/Settings/SettingsView.swift
 import SwiftUI
+import SwiftData
 
 struct SettingsView: View {
     @EnvironmentObject var credentials: CredentialsManager
