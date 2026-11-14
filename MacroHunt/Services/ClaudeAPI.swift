@@ -18,9 +18,10 @@ class ClaudeAPI {
     private static let maxTokens = 16_000
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     private static let anthropicVersion = "2023-06-01"
-    /// Beta header for server-side refusal fallback (`"fallbacks": "default"` in the body): if a
-    /// safety classifier declines, the API re-runs the request on another model instead of
-    /// returning the refusal. Harmless for food photos, and it keeps logging from dead-ending.
+    /// Beta header for server-side refusal fallback (`"fallbacks": "default"` in the body). On
+    /// Sonnet 5.5 it re-runs only `cyber` and `frontier_llm` declines on another model; the
+    /// other categories (`bio`, `reasoning_extraction`, `general_harms`) still come back as a
+    /// refusal, which `decodeResponse` surfaces as `APIError.refused`.
     private static let fallbackBeta = "server-side-fallback-2026-07-01"
 
     init(apiKey: String) {

@@ -138,11 +138,12 @@ Surfaced as the **Daily reflection** in the UX revamp.
 
 **Done in this PR:**
 - `Services/ClaudeAPI.swift` — `generateReflection(context:)`, separate from meal analysis.
-  Runs on **`claude-opus-4-8`** (meal analysis stays on `claude-sonnet-4-6`). Reuses the
-  structured-output (`output_config` + JSON schema) pattern; schema is
-  `{ headline, observations[], suggestion, encouragement }`. **Tone is enforced via the
-  system prompt:** supportive, curious, never shaming; food framed neutrally; one gentle
-  suggestion; explicitly not medical advice.
+  Shipped on **`claude-opus-4-8`** (meal analysis stayed on `claude-sonnet-4-6`). *Since
+  then:* the reflection moved to Sonnet in #19, and both calls run on `claude-sonnet-5-5`
+  since #26 (`ClaudeAPI.model`). Reuses the structured-output (`output_config` + JSON
+  schema) pattern; schema is `{ headline, observations[], suggestion, encouragement }`.
+  **Tone is enforced via the system prompt:** supportive, curious, never shaming; food
+  framed neutrally; one gentle suggestion; explicitly not medical advice.
 - `Models/Meal.swift` — `CoachingReflection` result struct mirroring the schema.
 - `Views/Today/TodayView.swift` — `ReflectionViewModel` builds a compact snapshot from
   `MealRepository` (today + 7-day averages + daily-calorie series) and best-effort Apple
